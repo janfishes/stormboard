@@ -139,7 +139,9 @@ by **position, never by name**.
 ### Two datum rules
 
 `62620` (estuary/ocean water surface elevation) and `63160` are **NAVD88**;
-everything else here is MLLW, so tidal readings get −2.25 ft on the way in. That
+everything else here is MLLW, so tidal readings get **+2.25 ft** on the way in — the
+sign is the opposite of what "NAVD88 is 2.25 ft above MLLW" sounds like, and
+build 2 had it backwards. That
 conversion is applied **only to tidal sites**. Spruce Creek near Samsula is 8 km
 upstream, above the tidal reach — converting it would turn a creek stage into a
 tide-looking number that means nothing. It is a **runoff** signal, and because it

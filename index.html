@@ -178,7 +178,7 @@
    BUILD_NUM is what the update check compares, so it must go up on every
    deploy or a phone holding a cached copy will never learn there is a new one.
    ===================================================================== */
-const BUILD_NUM = 3;
+const BUILD_NUM = 5;
 const BUILD_STAMP = "2026-08-06";
 
 /* =====================================================================
@@ -278,11 +278,61 @@ const P_ESTUARY = "62620", P_STAGE = "00065", P_NAVD = "63160", P_FLOW = "00060"
    NAVD88 5.19). USGS publishes 62620 and 63160 on NAVD88; everything on this
    page is MLLW, so tidal readings are converted on the way in.
 
+   THE SIGN IS THE OPPOSITE OF WHAT IT LOOKS LIKE, and build 2 got it wrong.
+   "NAVD88 is 2.25 ft above MLLW" describes the two reference SURFACES, so for a
+   water level measured UP from one of them the conversion ADDS:
+
+       height above MLLW = height above NAVD88 + 2.25
+
+   Work it on the station datum: the NAVD88 surface sits at 5.19 and the MLLW
+   surface at 2.94, so a water surface at 0.00 NAVD88 is 2.25 ft above MLLW, not
+   2.25 below it. The depth work checks out the same way — a contour 6 ft below
+   NAVD88 is 6 - 2.25 = 3.75 ft below MLLW, which is the 3.75 ft of water at dead
+   low that WTF's help quotes.
+
+   Subtracting instead reported every measured storm water level 4.5 ft LOW,
+   which is the one error this card could not afford. It was caught by sampling
+   3DEP elevations across a pond of known level, not by reading the code.
+
    THE CONVERSION APPLIES ONLY TO TIDAL SITES. Running it on Spruce Creek near
    Samsula — 8 km upstream, above the tidal reach — would produce a tide-like
    number for water that is not tidal at all. That gauge is a RUNOFF signal and
    is deliberately left on its own datum and never compared to a forecast. */
 const NAVD88_ABOVE_MLLW = 2.25;
+
+/* Every gauge site on this water, whether or not it is switched on.
+
+   This list exists so the map can show where a gauge WOULD appear, not just
+   where one is. Most of the year every one of these is dark, and a list that
+   only drew live gauges would be an empty box that taught you nothing.
+
+   `stn` entries are USGS Short-Term Network sites: pre-surveyed positions, with
+   the mounting already chosen, that get a sensor bolted to them when a
+   hurricane is forecast to land here. `nwis` entries are gauges that really
+   existed and were switched off, or that were deployed for one past storm.
+
+   Positions and dates verified against USGS on 2026-08-06. Nothing here is
+   fetched — the catalogue changes on a scale of years, and hard-coding it means
+   the map still draws with no signal, which is the whole point of this app.
+
+   DELIBERATELY NOT IN THIS LIST: any private position. The repo is public. Your
+   own location is drawn from `storm-here`, which never leaves the device. */
+const GAUGE_SITES = [
+  // Storm-deployment sites — dark until a hurricane is coming
+  { k:"stn", id:"FLVOL03142", lat:29.1025, lng:-80.9712, name:"Rose Bay Bridge" },
+  { k:"stn", id:"FLVOL03144", lat:29.0511, lng:-80.9595, name:"Turnbull Creek, at the trestle" },
+  { k:"stn", id:"FLVOL17777", lat:29.1486, lng:-80.9742, name:"Dunlawton bridge" },
+  { k:"stn", id:"FLVOL03140", lat:29.1459, lng:-80.9821, name:"Port Orange Park pier" },
+  { k:"stn", id:"FLVOL03145", lat:29.0314, lng:-80.9159, name:"New Smyrna Beach pier" },
+  { k:"stn", id:"FLVOL03143", lat:29.0850, lng:-80.9244, name:"Ponce Inlet beach" },
+  // Gauges that existed and were switched off
+  { k:"off", id:"290855080582700", lat:29.1486111, lng:-80.9741667, name:"Port Orange", note:"Matthew, Oct 2016" },
+  { k:"off", id:"291323081010500", lat:29.22225,   lng:-81.0200194, name:"Daytona, Main St", note:"Ian, Sept 2022" },
+  { k:"off", id:"02248060", lat:29.0510963, lng:-80.9594991, name:"Turnbull Creek", note:"ended 2009" },
+  { k:"off", id:"02248030", lat:29.115817,  lng:-80.9872772, name:"Halifax Canal, Harbor Oaks", note:"ended 2013" },
+  { k:"off", id:"02248025", lat:29.1585938, lng:-80.9992216, name:"Reed Canal", note:"ended 2013" },
+  { k:"off", id:"02248053", lat:29.0727625, lng:-80.9900553, name:"Spruce Creek nr NSB", note:"ended 2006" }
+];
 
 /* How close a gauge has to be to one of your spots before its reading is used
    to work out an observed surge. Matched by POSITION, never by name — the
@@ -946,7 +996,7 @@ async function fetchUsgs(){
     g.tidal = !!g.parms[P_ESTUARY];
     g.nm = distNm(INLET, { lat:g.lat, lng:g.lng });
     if(g.tidal){
-      g.mllw = g.parms[P_ESTUARY].v - NAVD88_ABOVE_MLLW;
+      g.mllw = g.parms[P_ESTUARY].v + NAVD88_ABOVE_MLLW;
       // Match to one of your spots BY POSITION, never by name.
       let best = null;
       for(const loc of LOCATIONS){
@@ -1328,6 +1378,123 @@ function waterHTML(){
   return s;
 }
 
+/* A locator for the gauges. Inline SVG and no basemap, for the same reason the
+   cone card has none: this app has to draw when the network is at its worst,
+   and a tile server is exactly the wrong dependency to acquire the night before
+   a hurricane. It is a diagram of WHERE, relative to water you already know, not
+   a chart. Your own spots are the reference marks — they are the geography you
+   can actually place. */
+function gaugeMapSVG(live){
+  const liveAt = {};
+  for(const g of live) liveAt[g.code] = g;
+
+  const pts = [];
+  for(const s of GAUGE_SITES){
+    // A catalogued site that is currently reporting is drawn as live, once.
+    const l = liveAt[s.id];
+    pts.push({ lat:s.lat, lng:s.lng, kind: l ? "live" : s.k, label:s.name, note:s.note });
+  }
+  // Anything reporting that is NOT in the catalogue — a brand new deployment.
+  for(const g of live){
+    if(!GAUGE_SITES.some(s => s.id === g.code)){
+      pts.push({ lat:g.lat, lng:g.lng, kind:"live", label:gaugeName(g.name) });
+    }
+  }
+  const spots = LOCATIONS.filter(l => isFinite(l.lat));
+  const all = pts.concat(spots.map(l => ({lat:l.lat, lng:l.lng})));
+  if(here) all.push({lat:here.lat, lng:here.lng});
+  if(!all.length) return "";
+
+  let x0 = Math.min(...all.map(p => p.lng)), x1 = Math.max(...all.map(p => p.lng));
+  let y0 = Math.min(...all.map(p => p.lat)), y1 = Math.max(...all.map(p => p.lat));
+  const px = Math.max((x1-x0)*0.16, 0.012), py = Math.max((y1-y0)*0.10, 0.012);
+  x0 -= px*2.4; x1 += px; y0 -= py; y1 += py;       // extra left margin for labels
+  const kx = Math.cos(((y0+y1)/2)*Math.PI/180);
+  const W = 640, H = Math.max(300, Math.min(560, Math.round(W*((y1-y0)/((x1-x0)*kx)))));
+  const X = v => (v - x0)/(x1 - x0)*W, Y = v => H - (v - y0)/(y1 - y0)*H;
+
+  let s = `<svg class="cone" viewBox="0 0 ${W} ${H}" role="img" aria-label="Where the gauges are">`;
+  s += `<rect width="${W}" height="${H}" fill="#EDF2F6"/>`;
+
+  // Your spots first, so a gauge pin always sits on top of them.
+  for(const l of spots){
+    s += `<circle cx="${X(l.lng).toFixed(1)}" cy="${Y(l.lat).toFixed(1)}" r="3.4" fill="#8A94A0"/>`;
+  }
+  /* Markers and labels are emitted in two passes, because these gauges cluster:
+     four of them sit within a mile of each other around Port Orange, and drawn
+     naively the labels land on top of one another and the map says less than the
+     list it was meant to illustrate.
+
+     So labels are collected, sorted down the page, and any that would collide
+     with the one above is pushed down — per side, since left- and right-anchored
+     labels cannot overlap each other. A leader line back to the pin keeps a
+     nudged label attached to its own dot. */
+  const labels = [];
+  for(const p of pts){
+    const x = X(p.lng), y = Y(p.lat);
+    const right = x < W*0.55;                       // keep labels inside the box
+    if(p.kind === "live"){
+      s += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="8" fill="#B23A2B" stroke="#FFFFFF" stroke-width="2.5"/>`;
+      labels.push({ x, y, right, t:p.label, col:"#B23A2B", off:13 });
+    }else if(p.kind === "stn"){
+      // Hollow and dashed: a site that exists on paper, waiting for a sensor.
+      s += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="7" fill="#FFFFFF" fill-opacity=".65"
+             stroke="#0A5A78" stroke-width="2.2" stroke-dasharray="3.2 2.4"/>`;
+      labels.push({ x, y, right, t:p.label, col:"#0A5A78", off:12 });
+    }else{
+      s += `<g stroke="#8A94A0" stroke-width="2" stroke-linecap="round">
+        <line x1="${(x-4.5).toFixed(1)}" y1="${(y-4.5).toFixed(1)}" x2="${(x+4.5).toFixed(1)}" y2="${(y+4.5).toFixed(1)}"/>
+        <line x1="${(x-4.5).toFixed(1)}" y1="${(y+4.5).toFixed(1)}" x2="${(x+4.5).toFixed(1)}" y2="${(y-4.5).toFixed(1)}"/></g>`;
+    }
+  }
+  /* De-collide across ALL labels, not per side. Doing it per side looked right
+     and was not: a left-anchored label and a right-anchored one can sit at the
+     same height and still run into each other in the middle of the map, which
+     is exactly what "Spruce Creek Near Samsula" and "Turnbull Creek, at the
+     trestle" did. One global pass costs a little vertical spread and cannot
+     produce an overlap. */
+  /* The two fixed marks join the SAME de-collision set. Emitting them separately
+     was the second version of this bug: the gauge labels no longer collided with
+     each other, and then PONCE INLET landed on one of them. Any label drawn
+     outside the pass will eventually hit a label inside it. */
+  if(here){
+    const x = X(here.lng), y = Y(here.lat);
+    s += `<path d="M${x.toFixed(1)} ${y.toFixed(1)} l-6 -9 a7 7 0 1 1 12 0 z" fill="#0F7B7B" stroke="#FFFFFF" stroke-width="2"/>`;
+    labels.push({ x, y: y-23, mid:true, t:"YOU", col:"#0F7B7B" });
+  }
+  const ix = X(INLET.lng), iy = Y(INLET.lat);
+  s += `<circle cx="${ix.toFixed(1)}" cy="${iy.toFixed(1)}" r="6" fill="#1B6F3B" stroke="#FFFFFF" stroke-width="2.5"/>`;
+  labels.push({ x:ix, y:iy-21, mid:true, t:"PONCE INLET", col:"#0E1F2E" });
+
+  const GAP = 14;
+  labels.sort((a,b) => a.y - b.y);
+  let last = -1e9;
+  for(const l of labels){
+    l.ly = Math.max(l.y, last + GAP);
+    last = l.ly;
+  }
+  for(const l of labels){
+    const tx = l.mid ? l.x : (l.right ? l.x + l.off : l.x - l.off);
+    const anchor = l.mid ? "middle" : (l.right ? "start" : "end");
+    if(!l.mid && Math.abs(l.ly - l.y) > 2){
+      s += `<line x1="${(l.right ? l.x+7 : l.x-7).toFixed(1)}" y1="${l.y.toFixed(1)}"
+             x2="${tx.toFixed(1)}" y2="${(l.ly - 3).toFixed(1)}"
+             stroke="${l.col}" stroke-width="1" stroke-opacity=".55"/>`;
+    }
+    s += `<text x="${tx.toFixed(1)}" y="${(l.ly + 3.6).toFixed(1)}" font-family="monospace"
+      font-size="10.5" font-weight="700" text-anchor="${anchor}" fill="${l.col}"
+      stroke="#EDF2F6" stroke-width="3.2" paint-order="stroke">${esc(l.t)}</text>`;
+  }
+  s += `</svg>`;
+  return s;
+}
+function gaugeLegendHTML(nLive){
+  return `<p class="note"><span style="color:#B23A2B">&#9679;</span> reporting now (${nLive}) &nbsp;
+    <span style="color:#0A5A78">&#9711;</span> storm-deployment site, dark until a hurricane &nbsp;
+    <span style="color:#8A94A0">&#10005;</span> switched off &nbsp;
+    <span style="color:#8A94A0">&#9679;</span> your spots</p>`;
+}
+
 /* ---- Measured water, runoff and rain ---- */
 function gaugesHTML(){
   const tidal = (gauges || []).filter(g => g.tidal);
@@ -1435,6 +1602,14 @@ function gaugesHTML(){
       bad combination.</p></div>`;
   }
 
+  /* ---- 4. Where they all are ---- */
+  s += `</div>${gaugeMapSVG(tidal.concat(creek))}<div class="body">`;
+  s += gaugeLegendHTML(tidal.length + creek.length);
+  s += `<p class="note">Hollow rings are USGS storm-deployment sites: the position is already surveyed
+        and the mounting chosen, and a sensor goes on it when a hurricane is forecast to land here.
+        Nothing is there today. If one is switched on it turns into a filled dot and starts reporting in
+        the table above on its own.</p>`;
+
   s += `<details class="help"><summary>Where these gauges are, and why there are so few</summary><div class="body2">
     <p><strong>Nothing permanent measures the tide in Port Orange or New Smyrna Beach.</strong> Checked
     site by site: Turnbull Creek near NSB, 40 m from the Turnbull Bay trestle, recorded 2000&ndash;2009
@@ -1445,7 +1620,7 @@ function gaugesHTML(){
     gauge, and its 59 samples are already spent: they are the +213/+247 lag and the 0.645 height scaling
     that WTF and My Tides use for that spot. You are reading it every time you open those apps &mdash;
     just as a calibration, not as a reading.</p>
-    <p><strong>Tidal readings are converted from NAVD88 to MLLW</strong> by subtracting 2.25 ft, which is
+    <p><strong>Tidal readings are converted from NAVD88 to MLLW</strong> by ADDING 2.25 ft, which is
     the measured separation at Ponce. That conversion is applied ONLY to gauges in tidal water. Running
     it on a creek gauge above the tidal reach would turn a creek stage into a tide-looking number that
     means nothing.</p>
