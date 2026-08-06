@@ -178,7 +178,7 @@
    BUILD_NUM is what the update check compares, so it must go up on every
    deploy or a phone holding a cached copy will never learn there is a new one.
    ===================================================================== */
-const BUILD_NUM = 5;
+const BUILD_NUM = 6;
 const BUILD_STAMP = "2026-08-06";
 
 /* =====================================================================
@@ -1593,13 +1593,20 @@ function gaugesHTML(){
       <p class="note">A stormwater pond, berm or dam fills with RAIN, and nothing public monitors those
       structures in real time &mdash; so this forecast and the creek above are the closest warning
       available.</p>
-      <p class="note"><strong>But rain is only half of why one overtops.</strong> These ponds drain east
-      to the Halifax by gravity, through an outfall at their own low level. When the surge lifts the
-      receiving water, that outfall stops draining and can run backwards &mdash; so the pond keeps
-      filling from the sky with nowhere to go. That is why the worst of it comes from rain and surge
-      TOGETHER, and why a pond can overtop on a rainfall total it has handled before. Read the peak
-      water time in the card above against the heaviest rain here: if they land together, that is the
-      bad combination.</p></div>`;
+      <p class="note"><strong>But rain is only half of why one overtops.</strong> A pond that drains by
+      gravity does it through an outfall at its own low level. When surge lifts the receiving water
+      that outfall stops draining and can run backwards, so the pond keeps filling from the sky with
+      nowhere to go. That is why the worst of it comes from rain and surge TOGETHER, and why a pond can
+      overtop on a rainfall total it has handled before. Read the peak water time in the card above
+      against the heaviest rain here: if they land together, that is the bad combination.</p>
+      <p class="note"><strong>And check whether yours is PUMPED.</strong> Several of the ponds here are,
+      and a pumped pond has a worse failure than a blocked outfall: it stops draining when the POWER
+      goes out, which in a hurricane is the same hours as the heaviest rain. If there is a pump, plan
+      on it being off. The owner &mdash; usually the city or the county &mdash; holds the control and
+      pump-start elevations, and in Florida the stormwater permit file is public: search the water
+      management district's permit portal by location and the engineering drawings in it give the weir
+      crest and the stage-storage. Beware the datum on old plans; drawings from the 2000s are often
+      NGVD29, about a foot off NAVD88.</p></div>`;
   }
 
   /* ---- 4. Where they all are ---- */
