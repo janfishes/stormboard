@@ -1,0 +1,16 @@
+{
+  "name": "Storm Board — Ponce Inlet & the Halifax",
+  "short_name": "Storm Board",
+  "description": "Hurricane and nor'easter prep for the Halifax River and Ponce de Leon Inlet: NHC forecast cone, surge forecast carried to your own dock, Volusia evacuation zones, and a haul-out countdown.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#FFFFFF",
+  "theme_color": "#0E1F2E",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

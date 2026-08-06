@@ -1,0 +1,14 @@
+# Deploy:  cd worker && npx wrangler login && npx wrangler deploy
+#
+# No account_id here on purpose — wrangler picks it up from your login, so this
+# file carries nothing personal and nothing secret. Whoever inherits the repo
+# can deploy their own copy under their own account by running the two commands
+# above; nothing needs editing first, except STORM_PROXY in ../index.html to
+# point at the URL wrangler prints.
+
+name = "storm-proxy"
+main = "storm-proxy.js"
+compatibility_date = "2026-08-06"
+
+# Serves at https://storm-proxy.<your-subdomain>.workers.dev
+workers_dev = true

@@ -1,0 +1,5 @@
+.DS_Store
+worker/.wrangler/
+worker/node_modules/
+_fixture.html
+_dbg.html

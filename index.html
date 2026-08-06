@@ -1,0 +1,1533 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Storm Board — Ponce Inlet &amp; the Halifax</title>
+<meta name="description" content="Storm Board — hurricane and nor'easter prep for the Halifax River and Ponce de Leon Inlet: NHC forecast cone, surge forecast carried to your own dock, Volusia evacuation zones, and a haul-out countdown.">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0E1F2E">
+<!-- "yes" here and display:standalone in the manifest are ONE decision, made for the PHONE:
+     full-screen app look on the Home Screen, no browser furniture. The same two switches also
+     govern macOS "Add to Dock", and there is no way to split them per platform — so the Mac
+     Dock icon has no address bar by design. Same call as My Tides; see its notes. On the Mac,
+     open the site as a normal Safari tab from a bookmark when you want the URL and a
+     Cmd-Shift-R force reload. -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Storm Board">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<!-- 32px favicon. THIRD copy of the artwork after the PNG masters and the inline SVG beside
+     the h1 — all three must be edited together on any icon change. Same trap My Tides has. -->
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"%3E%3Crect width="32" height="32" fill="%230E1F2E"/%3E%3Cpath d="M0 26.75 Q8 24.75 16 26.75 T32 26.75 L32 32 L0 32 Z" fill="%23295890"/%3E%3Cg fill="%23E8A317"%3E%3Cpath d="M19.38 15.06C20.75 10.88 22.38 8.06 25 9.56C21.69 5.88 14.13 4.56 9.25 5.56C13.44 7.88 16 10.44 17.5 13.38Z"/%3E%3Cpath d="M19.38 15.06C20.75 10.88 22.38 8.06 25 9.56C21.69 5.88 14.13 4.56 9.25 5.56C13.44 7.88 16 10.44 17.5 13.38Z" transform="rotate(180 16 14.69)"/%3E%3C/g%3E%3Ccircle cx="16" cy="14.69" r="2.56" fill="%23D7342A"/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" media="print" onload="this.media='all'"
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Condensed:wght@500;700&family=IBM+Plex+Mono:wght@400;500;700&display=swap">
+<style>
+  :root{
+    --paper:#FFFFFF;
+    --shoal:#EDF2F6;
+    --ink:#0E1F2E;
+    --ink-soft:#000000;
+    --hair:#C4CBD1;
+    --card:#FFFFFF;
+    --sea:#295890;
+    /* Threat ramp. Same discipline as My Tides' run ratings: the WORD always carries the
+       meaning and colour is only a second channel, so every card still reads correctly in
+       greyscale, in sun glare, or with colour-blindness. */
+    --calm:#1B6F3B;    --calm-soft:#E3F3E8;
+    --watch:#B87E00;   --watch-soft:#FDF3D9;
+    --warn:#B4530C;    --warn-soft:#FBEADF;
+    --sever:#B23A2B;   --sever-soft:#F7E5E1;
+    --water:#0A5A78;   --water-soft:#E4F2F8;
+    --sans:'IBM Plex Sans Condensed','Avenir Next Condensed','Helvetica Neue',Arial,sans-serif;
+    --mono:'IBM Plex Mono',ui-monospace,'SF Mono',Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    background:var(--paper);color:var(--ink);font-family:var(--sans);min-height:100vh;
+    -webkit-text-size-adjust:100%;
+    background-image:repeating-linear-gradient(0deg,transparent,transparent 39px,rgba(21,42,59,.035) 39px,rgba(21,42,59,.035) 40px);
+  }
+  .wrap{max-width:680px;margin:0 auto;padding:16px 14px calc(60px + env(safe-area-inset-bottom))}
+  header{border-bottom:3px double var(--ink);padding-bottom:10px;margin-bottom:10px}
+  .chart-no{font-family:var(--mono);font-size:11px;letter-spacing:.14em;color:var(--ink-soft);text-transform:uppercase}
+  h1{font-size:26px;font-weight:700;line-height:1.1;margin-top:2px;display:flex;align-items:center;gap:.34em}
+  h1 .thin{font-weight:500;color:var(--ink-soft)}
+  h1>span{min-width:0}
+  .ticon{width:1.3em;height:1.3em;flex:0 0 auto;display:block}
+  .sub-line{font-family:var(--mono);font-size:11px;color:var(--ink-soft);margin-top:4px}
+
+  .card{background:var(--card);border:1px solid var(--hair);border-radius:4px;margin-bottom:12px;overflow:hidden}
+  .card.alarm{border-color:var(--sever);box-shadow:0 0 0 2px var(--sever)}
+  .card.rising{border-color:var(--warn);box-shadow:0 0 0 2px var(--warn)}
+  .card-head{display:flex;justify-content:space-between;align-items:baseline;padding:10px 12px 4px;gap:8px}
+  .card-title{font-weight:700;font-size:17px}
+  .card-title .sub{display:block;font-family:var(--mono);font-size:10px;font-weight:400;color:var(--ink-soft);letter-spacing:.04em;text-transform:uppercase}
+  .badge{font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;white-space:nowrap;padding:2px 6px;border-radius:2px}
+  .badge.calm{color:var(--calm);background:var(--calm-soft)}
+  .badge.watch{color:var(--watch);background:var(--watch-soft)}
+  .badge.warn{color:var(--warn);background:var(--warn-soft)}
+  .badge.sever{color:var(--sever);background:var(--sever-soft)}
+  .badge.water{color:var(--water);background:var(--water-soft)}
+  .body{padding:6px 12px 12px}
+  .body p{font-size:13px;line-height:1.5;margin-bottom:8px}
+  .body p:last-child{margin-bottom:0}
+  .note{font-family:var(--mono);font-size:10px;line-height:1.5;color:var(--ink-soft);letter-spacing:.01em}
+  .rule{border-top:1px solid var(--hair);margin:10px -12px;padding-top:10px}
+
+  /* Big countdown numeral */
+  .clock{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;padding:2px 0 6px}
+  .clock .big{font-family:var(--mono);font-size:34px;font-weight:700;line-height:1}
+  .clock .unit{font-family:var(--mono);font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-soft)}
+  .clock.sever .big{color:var(--sever)}
+  .clock.warn .big{color:var(--warn)}
+  .clock.watch .big{color:var(--watch)}
+  .clock.calm .big{color:var(--calm)}
+
+  table.grid{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:11px}
+  table.grid th{text-align:left;font-weight:700;letter-spacing:.06em;text-transform:uppercase;font-size:9px;
+    color:var(--ink-soft);border-bottom:1px solid var(--hair);padding:4px 6px 4px 0}
+  table.grid td{padding:5px 6px 5px 0;border-bottom:1px solid var(--shoal);vertical-align:top}
+  table.grid tr:last-child td{border-bottom:0}
+  table.grid td.num{text-align:right;padding-right:10px;white-space:nowrap}
+  table.grid tr.over td{background:var(--sever-soft)}
+  table.grid tr.near td{background:var(--watch-soft)}
+  .wrapx{overflow-x:auto;-webkit-overflow-scrolling:touch}
+
+  .btn{font-family:var(--mono);font-size:11px;border:1px solid var(--ink);background:transparent;color:var(--ink);
+    padding:6px 9px;cursor:pointer;border-radius:2px}
+  .btn:hover{background:var(--ink);color:var(--paper)}
+  .btn.small{font-size:10px;padding:4px 7px}
+  .btnrow{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+  input[type=text],input[type=number]{font-family:var(--mono);font-size:12px;padding:5px 6px;border:1px solid var(--hair);
+    border-radius:2px;background:var(--paper);color:var(--ink);width:100%}
+  label.fld{display:block;font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.06em;
+    color:var(--ink-soft);margin-bottom:3px}
+
+  /* Checklist */
+  .chk{display:flex;gap:9px;align-items:flex-start;padding:6px 0;border-bottom:1px solid var(--shoal)}
+  .chk:last-child{border-bottom:0}
+  .chk input{margin-top:2px;width:17px;height:17px;flex:none;accent-color:var(--sea)}
+  .chk .txt{font-size:13px;line-height:1.4}
+  .chk .txt .why{display:block;font-family:var(--mono);font-size:10px;color:var(--ink-soft);margin-top:2px;line-height:1.45}
+  .chk.done .txt{opacity:.45;text-decoration:line-through}
+  .chk.done .txt .why{text-decoration:none}
+  .grouphd{font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
+    color:var(--ink-soft);margin:12px 0 2px;padding-top:8px;border-top:1px solid var(--hair)}
+  .grouphd:first-child{margin-top:0;padding-top:0;border-top:0}
+  .prog{font-family:var(--mono);font-size:10px;color:var(--ink-soft)}
+
+  .conewrap{background:var(--shoal);border-top:1px solid var(--hair);border-bottom:1px solid var(--hair)}
+  svg.cone{display:block;width:100%;height:auto}
+
+  .err{border:1px solid var(--sever);background:var(--sever-soft);padding:10px 12px;border-radius:4px;
+    font-size:13px;line-height:1.5;margin-bottom:12px}
+  .loading{font-family:var(--mono);font-size:12px;color:var(--ink-soft);padding:20px 2px}
+  .warnblock{border:2px solid var(--sever);background:var(--sever-soft);padding:10px 12px;border-radius:4px;margin-bottom:12px}
+  .warnblock .hd{font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--sever);margin-bottom:4px}
+  .warnblock p{font-size:12.5px;line-height:1.5}
+
+  footer{border-top:3px double var(--ink);margin-top:18px;padding-top:10px}
+  footer p{font-family:var(--mono);font-size:10px;line-height:1.6;color:var(--ink-soft);margin-bottom:7px}
+  footer a{color:var(--ink-soft)}
+
+  .updatepill{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(14px + env(safe-area-inset-bottom));
+    font-family:var(--mono);font-size:11px;background:var(--ink);color:var(--paper);border:0;border-radius:99px;
+    padding:9px 15px;cursor:pointer;z-index:50;box-shadow:0 2px 10px rgba(0,0,0,.3)}
+  details.help{border-top:1px solid var(--hair);margin-top:10px;padding-top:8px}
+  details.help summary{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.08em;
+    color:var(--ink-soft);cursor:pointer}
+  details.help .body2{padding-top:8px}
+  details.help p{font-size:12.5px;line-height:1.55;margin-bottom:8px}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <div class="chart-no">Volusia County, Florida &middot; Atlantic hurricane season</div>
+  <h1>
+    <!-- Inline copy of the icon. SECOND of the three places the artwork lives. -->
+    <svg class="ticon" viewBox="0 0 32 32" aria-hidden="true"><clipPath id="ic"><rect width="32" height="32" rx="6"/></clipPath><g clip-path="url(#ic)"><rect width="32" height="32" fill="#0E1F2E"/><path d="M0 26.75 Q8 24.75 16 26.75 T32 26.75 L32 32 L0 32 Z" fill="#295890"/><g fill="#E8A317"><path d="M19.38 15.06C20.75 10.88 22.38 8.06 25 9.56C21.69 5.88 14.13 4.56 9.25 5.56C13.44 7.88 16 10.44 17.5 13.38Z"/><path d="M19.38 15.06C20.75 10.88 22.38 8.06 25 9.56C21.69 5.88 14.13 4.56 9.25 5.56C13.44 7.88 16 10.44 17.5 13.38Z" transform="rotate(180 16 14.69)"/></g><circle cx="16" cy="14.69" r="2.56" fill="#D7342A"/></g></svg>
+    <span>Storm <span class="thin">Board</span></span>
+  </h1>
+  <div class="sub-line" id="subLine">Loading&hellip;</div>
+</header>
+
+<div id="content"><div class="loading">Reading the tropics, the surge model and the tide&hellip;</div></div>
+
+<footer>
+  <p id="buildLine"></p>
+  <p><strong>Sources.</strong> Tropical storms and forecast cones: National Hurricane Center.
+     Storm surge forecast: NOAA/NWS P-ETSS at Ponce de Leon Inlet South (station 8721147).
+     Astronomical tide: NOAA CO-OPS station 8721138, carried to each spot by My Tides'
+     measured lags and height scalings. Wind and watches/warnings: National Weather Service
+     Melbourne. Evacuation zones, surge zones, shelters and sandbag sites: Volusia County GIS.</p>
+  <p><strong>This is a planning tool, NOT an emergency instruction.</strong> It is informational
+     only. It does not tell you whether to evacuate. Volusia County Emergency Management and the
+     National Weather Service are the authorities on that, and an official evacuation order
+     overrides everything on this page. DO NOT USE THIS APP FOR NAVIGATION.</p>
+</footer>
+</div>
+
+<script>
+/* =====================================================================
+   STORM BOARD — build stamp
+
+   BUILD_NUM is what the update check compares, so it must go up on every
+   deploy or a phone holding a cached copy will never learn there is a new one.
+   ===================================================================== */
+const BUILD_NUM = 1;
+const BUILD_STAMP = "2026-08-06";
+
+/* =====================================================================
+   WHERE, AND WHAT WE TALK TO
+   ===================================================================== */
+const INLET = { lat: 29.077867, lng: -80.908517 };   // Ponce de Leon Inlet, same fix My Tides uses
+
+/* Our own Cloudflare Worker. It exists because exactly two feeds cannot be read
+   from a browser: NHC's CurrentStorms.json sends no CORS header at all, and
+   P-ETSS is a POST to a PHP endpoint that also sends none. Everything else on
+   this page — the NHC cone shapefiles, api.weather.gov, CO-OPS, Volusia's
+   ArcGIS — is CORS-open and is fetched directly. See worker/storm-proxy.js.
+
+   Deliberately a plain constant rather than a build step or a setting: the app
+   is one file with no build, and a new owner should be able to point it at
+   their own worker by editing one line. */
+const STORM_PROXY = "https://storm-proxy.janfishes.workers.dev";
+
+/* The astronomical tide comes from 8721138 — the SAME station My Tides uses —
+   so the two apps can never disagree about the tide. The surge comes from
+   8721147, which is the P-ETSS forecast point at Ponce Inlet and the only place
+   a forecast surge height for this water exists.
+
+   Mixing two stations is safe here for one specific reason, and it is the
+   reason this app can exist at all: what is taken from 8721147 is the ANOMALY
+   (`ss`), not a water level. An anomaly is a difference — the storm's
+   contribution on top of whatever the astronomical tide was doing — so it
+   transfers between nearby stations. An absolute total water level would not;
+   that is why `twl` from the same feed is deliberately ignored. */
+const TIDE_STATION = "8721138";
+const PETSS_STATION = "8721147";
+
+const NWS_GRID = "https://api.weather.gov/gridpoints/MLB/42,94";   // the inlet's forecast cell
+const NWS_ZONES = "FLZ141,AMZ550";     // coastal Volusia, and the 0-20 nm waters off it
+
+/* Volusia County's own "Know Your Zone" service — CORS-open, verified
+   2026-08-06. Layer numbers are stable but not guaranteed forever; if a card
+   goes blank, re-read <base>?f=json before suspecting the code. */
+const VC_BASE = "https://services.arcgis.com/YvSMAk2zZNXXVujI/arcgis/rest/services/Know_Your_Zone_WFL1/FeatureServer";
+const VC_LAYER = { sandbags:1, shelters:2, routes:3, surgezone:4, evaczone:5 };
+
+/* NHC GIS — the cone. This one carries a trap worth remembering.
+
+   `curl -H 'Origin: …'` against these zips returns access-control-allow-origin:
+   * every single time, so by the usual test they look CORS-open. A real browser
+   fetch fails outright with "TypeError: Failed to fetch". CloudFront is caching
+   a copy of the object WITHOUT the CORS header and there is no Vary: Origin, so
+   which copy you get is down to which edge you hit. It would have worked in
+   testing and failed during a hurricane, or the reverse.
+
+   So the cone goes through the worker like everything else NHC. The direct URL
+   is kept only as a long-shot fallback for when the worker itself is down.
+   LESSON: verify CORS in a BROWSER, not with curl. curl does not enforce it and
+   therefore cannot see it being absent. */
+const NHC_GIS = "https://www.nhc.noaa.gov/gis/forecast/archive/";
+
+/* Wind thresholds, in mph, from the NWS definitions. These are the numbers the
+   countdown is built on and they are not tunable — a "tropical storm force
+   wind" is 39 mph everywhere, and letting it be edited would let the deadline
+   be argued with. What IS tunable is how much lead time you want ahead of it. */
+const TS_FORCE_MPH = 39;
+const HURR_FORCE_MPH = 74;
+
+/* =====================================================================
+   SPOTS — a COPY of My Tides' built-in cards, deliberately.
+
+   Same rule Mini Mapper follows: the card LIST changes rarely, the
+   CALIBRATIONS change often and come across live from shared localStorage. If
+   My Tides changes its built-ins, copy them here too, or the same storm tide
+   will be reported differently by the two apps.
+
+   hi/lo are lag in minutes behind the inlet. hs/ho/ls/lo_ are the measured
+   height model, WTF's form kept exactly:
+       shown_high = hs*ref_high + ho      shown_low = ls*ref_low + lo_
+   A spot with no measured scaling keeps the inlet's heights unchanged and SAYS
+   so, rather than being silently damped by a guess.
+   ===================================================================== */
+const BUILTIN_LOCATIONS = [
+  { key:"inlet",     name:"Ponce Inlet (reference)", charted:"Ponce de Leon Inlet",
+    lat:29.077867, lng:-80.908517, hi:0, lo:0, fixed:true,
+    hs:1, ho:0, ls:1, lo_:0, measured:true },
+  { key:"threebr",   name:"Three Bridges",           charted:"Halifax River at the three spans",
+    lat:29.086350, lng:-80.968633, hi:75,  lo:90,  est:true },
+  { key:"trestle",   name:"Spruce Creek Trestle",    charted:"FEC railroad, Spruce Creek",
+    lat:29.080050, lng:-80.983283, hi:105, lo:120, est:true },
+  { key:"tbtrestle", name:"Turnbull Bay Trestle",    charted:"FEC railroad, Turnbull Bay",
+    lat:29.050700, lng:-80.959650, hi:110, lo:130, est:true },
+  { key:"crooks",    name:"Crook's Corner",          charted:"Turnbull Bay",
+    lat:29.043000, lng:-80.959817, hi:120, lo:140, est:true },
+  { key:"fairway",   name:"DJM",                     charted:"Aqua Ct tide gauge",
+    lat:29.032633, lng:-80.946983, gauge:true, hi:149, lo:188, measured:true,
+    hs:0.59, ho:-0.04, ls:0.59, lo_:-0.04 },
+  { key:"dunlawton", name:"Dunlawton Bridge",        charted:"Halifax River, Dunlawton Bridge",
+    lat:29.148333, lng:-80.975317, hi:90,  lo:105,
+    hs:0.536, ho:-0.280, ls:0.536, lo_:-0.280, measured:true }
+];
+
+/* =====================================================================
+   SHARED STATE
+
+   Storm Board is on janfishes.github.io, the same origin as My Tides and Mini
+   Mapper, so it can READ their localStorage directly. That is how a lag Jan
+   calibrates on the tide board improves the surge forecast here on the next
+   open, with no export step and nothing to keep in sync.
+
+   It READS  tide-lags, tide-positions, tide-added-spots  (My Tides' keys)
+   and WRITES only its own storm-* keys. It must never write a tide-* key: two
+   apps writing one key is how a calibration gets silently overwritten by a app
+   that did not measure it.
+   ===================================================================== */
+const LS = {
+  // read-only, borrowed from My Tides
+  lags:'tide-lags', pos:'tide-positions', added:'tide-added-spots',
+  // ours
+  thresholds:'storm-thresholds', checks:'storm-checks', lead:'storm-lead-hours',
+  here:'storm-here', transfer:'storm-surge-transfer'
+};
+function lsGet(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } }
+function lsSet(k,v){ try{ localStorage.setItem(k,v); }catch(e){} }
+
+let LOCATIONS = [], offsets = {}, userPos = {}, addedSpots = [];
+let thresholds = {};      // spot key -> { ft, label }
+let checks = {};          // checklist id -> true
+let leadHours = 24;       // how far ahead of tropical-storm-force wind you want to be done
+let surgeTransfer = 1.0;  // see SURGE TRANSFER below
+let here = null;          // {lat,lng,acc,when} — where "your zone" is answered for
+
+function loadPrefs(){
+  LOCATIONS = BUILTIN_LOCATIONS.slice();
+  try{
+    const a = JSON.parse(lsGet(LS.added) || "[]");
+    if(Array.isArray(a)) addedSpots = a;
+  }catch(e){ addedSpots = []; }
+  for(const s of addedSpots) LOCATIONS.push(Object.assign({ est:true, added:true }, s));
+
+  for(const loc of LOCATIONS) offsets[loc.key] = { hi:loc.hi, lo:loc.lo };
+  try{ const raw = lsGet(LS.lags); if(raw) Object.assign(offsets, JSON.parse(raw)); }catch(e){}
+  try{ const raw = lsGet(LS.pos);  if(raw) userPos = JSON.parse(raw) || {}; }catch(e){ userPos = {}; }
+  for(const loc of LOCATIONS){
+    const p = userPos[loc.key];
+    if(p && isFinite(p.lat) && isFinite(p.lng)){ loc.lat = p.lat; loc.lng = p.lng; }
+  }
+
+  try{ thresholds = JSON.parse(lsGet(LS.thresholds) || "{}") || {}; }catch(e){ thresholds = {}; }
+  try{ checks = JSON.parse(lsGet(LS.checks) || "{}") || {}; }catch(e){ checks = {}; }
+  const lh = parseFloat(lsGet(LS.lead));    if(lh >= 0 && lh <= 96) leadHours = lh;
+  const st = parseFloat(lsGet(LS.transfer)); if(st > 0.2 && st <= 2) surgeTransfer = st;
+  try{ const h = JSON.parse(lsGet(LS.here) || "null"); if(h && isFinite(h.lat)) here = h; }catch(e){}
+}
+const saveThresholds = () => lsSet(LS.thresholds, JSON.stringify(thresholds));
+const saveChecks     = () => lsSet(LS.checks, JSON.stringify(checks));
+
+/* =====================================================================
+   SMALL HELPERS
+   ===================================================================== */
+function esc(s){ return String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+const fmtT = d => d.toLocaleTimeString([], {hour:"numeric", minute:"2-digit"});
+const fmtDT = d => d.toLocaleDateString([], {weekday:"short", month:"numeric", day:"numeric"}) + " " + fmtT(d);
+const titleCase = s => String(s).toLowerCase().replace(/\b[a-z]/g, c => c.toUpperCase());
+
+function fetchT(url, ms, opts){
+  const ctl = new AbortController();
+  const t = setTimeout(() => ctl.abort(), ms);
+  return fetch(url, Object.assign({ signal: ctl.signal }, opts || {})).finally(() => clearTimeout(t));
+}
+function distNm(a, b){
+  const R = 3440.065, toR = Math.PI/180;
+  const dLat = (b.lat-a.lat)*toR, dLng = (b.lng-a.lng)*toR;
+  const la1 = a.lat*toR, la2 = b.lat*toR;
+  const h = Math.sin(dLat/2)**2 + Math.cos(la1)*Math.cos(la2)*Math.sin(dLng/2)**2;
+  return 2*R*Math.asin(Math.min(1, Math.sqrt(h)));
+}
+function bearing(a, b){
+  const toR = Math.PI/180, toD = 180/Math.PI;
+  const la1 = a.lat*toR, la2 = b.lat*toR, dLng = (b.lng-a.lng)*toR;
+  const y = Math.sin(dLng)*Math.cos(la2);
+  const x = Math.cos(la1)*Math.sin(la2) - Math.sin(la1)*Math.cos(la2)*Math.cos(dLng);
+  return (Math.atan2(y,x)*toD + 360) % 360;
+}
+const COMPASS = ["N","NNE","NE","ENE","E","ESE","SE","SSE","S","SSW","SW","WSW","W","WNW","NW","NNW"];
+const degToCompass = d => COMPASS[Math.round(((d%360)+360)%360/22.5) % 16];
+
+function ago(ms){
+  const m = Math.round(ms/60000);
+  if(m < 1) return "just now";
+  if(m < 60) return m + " min ago";
+  const h = m/60;
+  if(h < 24) return (h < 2 ? "1 hour" : Math.round(h) + " hours") + " ago";
+  return Math.round(h/24) + " days ago";
+}
+/* Countdown words. Hours to one decimal under 10 h is false precision on a
+   forecast wind field, so it steps: minutes under an hour, whole hours to two
+   days, then days. */
+function until(ms){
+  if(ms <= 0) return { n:"NOW", u:"" };
+  const m = ms/60000;
+  if(m < 60)   return { n:String(Math.round(m)), u:"minutes" };
+  const h = m/60;
+  if(h < 48)   return { n:String(Math.round(h)), u:"hours" };
+  return { n:String(Math.round(h/24)), u:"days" };
+}
+
+/* =====================================================================
+   ASTRONOMICAL TIDE — the same engine as My Tides, and deliberately so.
+
+   Highs and lows from CO-OPS, shifted by the spot's measured lag and scaled by
+   its measured height model, then interpolated with the classic cosine curve
+   between each pair. Identical maths to the tide board, so a height read here
+   and a height read there for the same spot and minute agree exactly.
+   ===================================================================== */
+let preds = [];      // [{time:Date, ft:Number, type:'H'|'L'}] at the reference station
+
+function ymd(d){
+  return d.getFullYear() + String(d.getMonth()+1).padStart(2,"0") + String(d.getDate()).padStart(2,"0");
+}
+function parseNOAA(s){
+  const [d,t] = s.split(" ");
+  const [Y,M,D] = d.split("-").map(Number);
+  const [h,m]   = t.split(":").map(Number);
+  return new Date(Y, M-1, D, h, m);
+}
+async function fetchPreds(){
+  const begin = new Date(); begin.setDate(begin.getDate()-2);
+  const end   = new Date(); end.setDate(end.getDate()+8);
+  const url = "https://api.tidesandcurrents.noaa.gov/api/prod/datagetter"
+    + "?product=predictions&application=storm_board"
+    + "&begin_date=" + ymd(begin) + "&end_date=" + ymd(end)
+    + "&datum=MLLW&station=" + TIDE_STATION
+    + "&time_zone=lst_ldt&units=english&interval=hilo&format=json";
+  const res = await fetchT(url, 12000);
+  const data = await res.json();
+  if(!data.predictions || !data.predictions.length){
+    throw new Error((data.error && data.error.message) || "NOAA returned no predictions");
+  }
+  return data.predictions.map(p => ({ time:parseNOAA(p.t), ft:parseFloat(p.v), type:p.type }));
+}
+
+function shifted(locKey){
+  const o = offsets[locKey] || { hi:0, lo:0 };
+  const loc = LOCATIONS.find(l => l.key === locKey);
+  const sc = (loc && isFinite(loc.hs)) ? loc : null;
+  return preds.map(p => {
+    const isH = p.type === "H";
+    const ft = sc ? (isH ? sc.hs*p.ft + sc.ho : sc.ls*p.ft + sc.lo_) : p.ft;
+    return { time: new Date(p.time.getTime() + (isH ? o.hi : o.lo)*60000), ft, type: p.type };
+  }).sort((a,b) => a.time - b.time);
+}
+function tideAt(events, t){
+  for(let i = 0; i < events.length - 1; i++){
+    const a = events[i], b = events[i+1];
+    if(t >= a.time && t <= b.time){
+      const span = b.time - a.time;
+      if(span <= 0) return null;
+      const f = (t - a.time)/span;
+      return a.ft + (b.ft - a.ft)*(1 - Math.cos(Math.PI*f))/2;
+    }
+  }
+  return null;
+}
+
+/* =====================================================================
+   SURGE — P-ETSS, and how it gets from the inlet to your dock
+
+   THE FEED. P-ETSS (Probabilistic Extra-Tropical Storm Surge) runs four times a
+   day and publishes a point forecast at station 8721147, Ponce de Leon Inlet
+   South. `ss` is the surge in feet — the storm's contribution ON TOP of the
+   astronomical tide — hourly, out to about four days. It is the only forecast
+   surge height that exists for this water. Despite the "extra-tropical" in the
+   name it is the operational product for nor'easters AND is run alongside the
+   tropical guidance; NHC's P-Surge is the tropical-specific companion and is
+   gridded inundation rather than a point series, which is why this one is here.
+
+   THE MISSING GAUGE. There is no water level gauge at Ponce. Station 8721138 is
+   prediction-only, and so is 8721147 (`obs` and `anom` come back 9999 for
+   every timestep — checked, not assumed). The nearest real gauges are Trident
+   Pier, 54 nm south, and Mayport, 100 nm north. So this app can forecast the
+   surge here but CANNOT measure it here, and it never claims to.
+
+   SURGE TRANSFER — the one modelling assumption, stated plainly.
+
+   The astronomical tide is heavily damped on its way up these creeks: the water
+   at DJM swings 0.59 of what the inlet does, at Dunlawton 0.536. It would be
+   easy, and wrong, to damp the surge by the same factor.
+
+   Frictional damping of a long wave rises with its frequency. The semidiurnal
+   tide turns around every six hours and loses a lot of its range doing it. A
+   storm surge is a far longer wave — it builds and falls over many hours to a
+   day or two — so it propagates into a shallow bay with much less loss, and
+   arrives close to unattenuated. On top of that, a dead-end bay with the wind
+   blowing up it adds its own set-up, which can put the level ABOVE the open
+   coast figure. Turnbull Bay and Rose Bay are exactly that shape.
+
+   So the default transfer is 1.0 — the surge at your dock is taken to be the
+   surge at the inlet — and that is a CENTRAL estimate, not a conservative one.
+   It can be edited, and the number in force is printed on the card, because an
+   assumption you cannot see is an assumption you cannot argue with.
+
+   The surge is delayed by the spot's own tide lag. Both a surge and a tide
+   travel as long waves at about sqrt(g*depth), so the time the tide takes to
+   reach a spot is the best available estimate of the time the surge takes. It
+   is an approximation and is labelled as one.
+   ===================================================================== */
+let surge = null;      // { t:[Date], ss:[ft], issued:Date }  hourly at the inlet
+let surgeErr = null;
+
+async function fetchSurge(){
+  const r = await fetchT(STORM_PROXY.replace(/\/$/,'') + "/petss?station=" + PETSS_STATION, 15000);
+  if(!r.ok) throw new Error("P-ETSS " + r.status);
+  const d = await r.json();
+  if(d.error) throw new Error(d.error);
+  const t = [], ss = [];
+  for(let i = 0; i < d.ts.length; i++){
+    const v = d.ss[i];
+    if(v === 9999 || v == null) continue;       // P-ETSS's missing value; hourly on a 6-min grid
+    const s = d.ts[i];                          // "YYYYMMDDHHmm", UTC
+    const dt = new Date(Date.UTC(+s.slice(0,4), +s.slice(4,6)-1, +s.slice(6,8), +s.slice(8,10), +s.slice(10,12)));
+    if(isNaN(dt.getTime())) continue;
+    t.push(dt); ss.push(v);
+  }
+  if(!t.length) throw new Error("P-ETSS returned no surge values");
+  return { t, ss, issued: t[0], end: t[t.length-1] };
+}
+
+/* Linear interpolation in the hourly surge series. Returns null OUTSIDE the
+   series rather than clamping to the end value: past the model's horizon we do
+   not know the surge, and holding the last value flat would quietly invent a
+   forecast that keeps going. A card that says "beyond the surge forecast" is
+   correct; one that shows a number is not. */
+function surgeAt(t){
+  if(!surge) return null;
+  const ms = t.getTime();
+  if(ms < surge.t[0].getTime() || ms > surge.t[surge.t.length-1].getTime()) return null;
+  for(let i = 0; i < surge.t.length - 1; i++){
+    const a = surge.t[i].getTime(), b = surge.t[i+1].getTime();
+    if(ms >= a && ms <= b){
+      const f = (b === a) ? 0 : (ms - a)/(b - a);
+      return surge.ss[i] + (surge.ss[i+1] - surge.ss[i])*f;
+    }
+  }
+  return null;
+}
+
+/* Total still-water level at a spot: its own astronomical tide plus the inlet
+   surge, delayed by the spot's lag and scaled by the transfer factor. */
+function totalAt(loc, events, t){
+  const astro = tideAt(events, t);
+  if(astro == null) return null;
+  const o = offsets[loc.key] || { hi:0, lo:0 };
+  const lagMin = (o.hi + o.lo)/2;
+  const s = surgeAt(new Date(t.getTime() - lagMin*60000));
+  if(s == null) return { astro, surge:null, total:null };
+  return { astro, surge: s*surgeTransfer, total: astro + s*surgeTransfer };
+}
+
+/* Walk the surge window in 10-minute steps and find the highest total, plus the
+   first and last time it is above a threshold. 10 minutes is finer than either
+   input (hourly surge, cosine tide) so it costs nothing to be exact about the
+   crossing times. */
+function spotOutlook(loc, thresholdFt){
+  if(!surge || !preds.length) return null;
+  const events = shifted(loc.key);
+  const t0 = Math.max(Date.now(), surge.t[0].getTime());
+  const t1 = surge.t[surge.t.length-1].getTime();
+  let peak = null, first = null, last = null, anyTotal = false;
+  for(let ms = t0; ms <= t1; ms += 600000){
+    const t = new Date(ms);
+    const r = totalAt(loc, events, t);
+    if(!r || r.total == null) continue;
+    anyTotal = true;
+    if(!peak || r.total > peak.total) peak = { total:r.total, astro:r.astro, surge:r.surge, t };
+    if(thresholdFt != null && isFinite(thresholdFt)){
+      if(r.total >= thresholdFt){ if(!first) first = t; last = t; }
+    }
+  }
+  if(!anyTotal) return null;
+  return { peak, first, last, horizon: new Date(t1) };
+}
+
+/* =====================================================================
+   WIND — the countdown clock
+
+   api.weather.gov sends access-control-allow-origin: * so it needs no proxy.
+   The gridpoint gives sustained wind and gusts as spans; a single span can
+   cover many hours, so they are expanded and looked up by instant, exactly as
+   My Tides does it.
+   ===================================================================== */
+let wx = null, wxErr = null, alerts = null;
+
+function parseISODur(s){
+  const m = /^P(?:(\d+)Y)?(?:(\d+)M)?(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:([\d.]+)S)?)?$/.exec(s);
+  if(!m) return 3600000;
+  return ((+m[3]||0)*86400 + (+m[4]||0)*3600 + (+m[5]||0)*60 + (+m[6]||0))*1000;
+}
+function nwsSpans(node, conv){
+  if(!node || !Array.isArray(node.values)) return [];
+  return node.values.filter(v => v.value !== null).map(v => {
+    const [iso, dur] = v.validTime.split("/");
+    const t0 = new Date(iso);
+    return { t0, t1: new Date(t0.getTime() + parseISODur(dur)), v: conv(v.value) };
+  });
+}
+async function fetchWx(){
+  const r = await fetchT(NWS_GRID, 12000, { headers:{ "Accept":"application/geo+json" } });
+  if(!r.ok) throw new Error("NWS " + r.status);
+  const p = (await r.json()).properties;
+  const KMH_TO_MPH = 0.621371;
+  return {
+    wind: nwsSpans(p.windSpeed, v => v*KMH_TO_MPH),
+    gust: nwsSpans(p.windGust, v => v*KMH_TO_MPH),
+    updated: p.updateTime ? new Date(p.updateTime) : null
+  };
+}
+async function fetchAlerts(){
+  const r = await fetchT("https://api.weather.gov/alerts/active?zone=" + NWS_ZONES, 10000);
+  if(!r.ok) throw new Error("NWS alerts " + r.status);
+  return ((await r.json()).features || []).map(f => {
+    const p = f.properties || {};
+    return {
+      event: p.event || "Weather alert",
+      headline: p.headline || "",
+      severity: p.severity || "",
+      area: p.areaDesc || "",
+      from: p.onset ? new Date(p.onset) : (p.effective ? new Date(p.effective) : null),
+      to:   p.ends  ? new Date(p.ends)  : (p.expires   ? new Date(p.expires)   : null)
+    };
+  });
+}
+
+/* First time the forecast sustained wind — or the gust, whichever crosses first
+   — reaches a threshold. Gusts are included on purpose: a 40 mph gust will take
+   a poorly strapped boat off a trailer just as well as a 40 mph sustained wind,
+   and the gust field almost always crosses first, so using sustained alone
+   would hand back a deadline that is hours too generous. */
+function firstAbove(mph){
+  if(!wx) return null;
+  const cands = [];
+  for(const s of wx.wind) if(s.v >= mph) cands.push({ t:s.t0, v:s.v, kind:"sustained" });
+  for(const s of wx.gust) if(s.v >= mph) cands.push({ t:s.t0, v:s.v, kind:"gusts" });
+  if(!cands.length) return null;
+  cands.sort((a,b) => a.t - b.t);
+  return cands[0];
+}
+function peakWind(){
+  if(!wx) return null;
+  let best = null;
+  for(const s of wx.wind) if(!best || s.v > best.v) best = { t:s.t0, v:s.v, kind:"sustained" };
+  for(const s of wx.gust) if(!best || s.v > best.v) best = { t:s.t0, v:s.v, kind:"gusts" };
+  return best;
+}
+
+/* =====================================================================
+   THE TROPICS — NHC
+
+   CurrentStorms.json (via the worker) is the list of what is active. For each
+   storm the 5-day cone and forecast track are fetched as a shapefile ZIP from
+   nhc.noaa.gov/gis/, which IS CORS-open.
+
+   No library is used to read them. A zip entry is inflated with the browser's
+   own DecompressionStream('deflate-raw'), and shapefile/dBASE are simple enough
+   binary formats to read directly — about a hundred lines, against pulling a
+   parsing library off a CDN into an app whose whole point is that it is one
+   file that works with a bad signal.
+   ===================================================================== */
+let storms = null, stormsErr = null;
+const coneCache = {};      // storm id -> { cone:[[lng,lat]...], track:[...], pts:[{...}] } | 'err'
+
+async function fetchStorms(){
+  const r = await fetchT(STORM_PROXY.replace(/\/$/,'') + "/nhc", 12000);
+  if(!r.ok) throw new Error("NHC " + r.status);
+  const d = await r.json();
+  if(d.error) throw new Error(d.error);
+  return Array.isArray(d.activeStorms) ? d.activeStorms : [];
+}
+
+/* --- ZIP: just enough to pull named entries out ------------------------
+   Reads the End Of Central Directory record, walks the central directory, and
+   inflates each entry. Only STORE (0) and DEFLATE (8) are handled, which is
+   everything NHC produces — all six entries in a 5-day zip are deflate,
+   checked on the Milton archive. */
+async function unzip(buf){
+  const dv = new DataView(buf), u8 = new Uint8Array(buf);
+  let eocd = -1;
+  for(let i = u8.length - 22; i >= 0 && i >= u8.length - 65558; i--){
+    if(dv.getUint32(i, true) === 0x06054b50){ eocd = i; break; }
+  }
+  if(eocd < 0) throw new Error("not a zip");
+  const n = dv.getUint16(eocd + 10, true);
+  let off = dv.getUint32(eocd + 16, true);
+  const out = {};
+  for(let k = 0; k < n; k++){
+    if(dv.getUint32(off, true) !== 0x02014b50) break;
+    const method  = dv.getUint16(off + 10, true);
+    const csize   = dv.getUint32(off + 20, true);
+    const nameLen = dv.getUint16(off + 28, true);
+    const extLen  = dv.getUint16(off + 30, true);
+    const cmtLen  = dv.getUint16(off + 32, true);
+    const lho     = dv.getUint32(off + 42, true);
+    const name    = new TextDecoder().decode(u8.subarray(off + 46, off + 46 + nameLen));
+    // The local header repeats the name/extra lengths and they can DIFFER from
+    // the central directory's, so the data offset must be read from the local
+    // header — using the central copy is the classic way to land mid-file.
+    const lNameLen = dv.getUint16(lho + 26, true);
+    const lExtLen  = dv.getUint16(lho + 28, true);
+    const dataOff  = lho + 30 + lNameLen + lExtLen;
+    const raw = u8.subarray(dataOff, dataOff + csize);
+    if(method === 0){
+      out[name] = raw.slice().buffer;
+    }else if(method === 8){
+      const ds = new DecompressionStream("deflate-raw");
+      const blob = new Response(new Blob([raw]).stream().pipeThrough(ds));
+      out[name] = await blob.arrayBuffer();
+    }
+    off += 46 + nameLen + extLen + cmtLen;
+  }
+  return out;
+}
+
+/* --- Shapefile: points, polylines and polygons ------------------------- */
+function parseShp(buf){
+  const dv = new DataView(buf);
+  const shapes = [];
+  let off = 100;                                  // fixed header
+  while(off + 8 <= buf.byteLength){
+    const clen = dv.getInt32(off + 4, false)*2;   // content length, in 16-bit words
+    const type = dv.getInt32(off + 8, true);
+    const p = off + 12;
+    if(type === 1){                               // Point
+      shapes.push({ type:1, pts:[[dv.getFloat64(p, true), dv.getFloat64(p + 8, true)]] });
+    }else if(type === 3 || type === 5){           // PolyLine / Polygon
+      const nParts  = dv.getInt32(p + 32, true);
+      const nPoints = dv.getInt32(p + 36, true);
+      const partsAt = p + 40;
+      const ptsAt   = partsAt + nParts*4;
+      const parts = [];
+      for(let i = 0; i < nParts; i++){
+        const s = dv.getInt32(partsAt + i*4, true);
+        const e = (i === nParts - 1) ? nPoints : dv.getInt32(partsAt + (i+1)*4, true);
+        const ring = [];
+        for(let j = s; j < e; j++){
+          ring.push([dv.getFloat64(ptsAt + j*16, true), dv.getFloat64(ptsAt + j*16 + 8, true)]);
+        }
+        parts.push(ring);
+      }
+      shapes.push({ type, parts });
+    }
+    off += 8 + clen;
+  }
+  return shapes;
+}
+
+/* --- dBASE III: the attribute table beside the geometry ---------------- */
+function parseDbf(buf){
+  const dv = new DataView(buf), u8 = new Uint8Array(buf);
+  const nRec = dv.getUint32(4, true), hLen = dv.getUint16(8, true), rLen = dv.getUint16(10, true);
+  const fields = [];
+  let off = 32;
+  while(off < hLen - 1 && u8[off] !== 0x0D){
+    const name = new TextDecoder().decode(u8.subarray(off, off + 11)).replace(/\0.*$/, "");
+    fields.push({ name, len: u8[off + 16] });
+    off += 32;
+  }
+  const dec = new TextDecoder("windows-1252");
+  const rows = [];
+  for(let r = 0; r < nRec; r++){
+    const base = hLen + r*rLen;
+    if(base + rLen > buf.byteLength) break;
+    let p = base + 1;                             // first byte is the deletion flag
+    const o = {};
+    for(const f of fields){
+      o[f.name] = dec.decode(u8.subarray(p, p + f.len)).trim();
+      p += f.len;
+    }
+    rows.push(o);
+  }
+  return rows;
+}
+
+/* Fetch and parse one storm's 5-day cone package.
+
+   The package is "<id>_5day_<adv>.zip" in the GIS archive, where adv is an
+   advisory number or "latest" — verified against al142024 on 2026-08-06. It is
+   requested through the worker for the CORS reason described at NHC_GIS above.
+
+   If CurrentStorms.json names a specific advisory in its forecastCone entry we
+   use that number, since it is NHC's own pointer at the current advisory;
+   otherwise "latest", which is what the archive fixtures use. */
+async function fetchCone(storm){
+  const id = String(storm.id || "").toLowerCase();
+  if(!/^[a-z]{2}\d{6}$/.test(id)) throw new Error("unrecognised storm id");
+  const given = String((storm.forecastCone && (storm.forecastCone.zipFile || storm.forecastCone.zip)) || "");
+  const m = /_5day_(\d{1,3}[a-z]?)\.zip/i.exec(given);
+  const adv = m ? m[1].toLowerCase() : "latest";
+  const base = STORM_PROXY.replace(/\/$/, "");
+  const urls = [
+    base + "/cone?id=" + id + "&adv=" + adv,
+    // Long shot, and only for when the worker itself is down: this succeeds or
+    // fails depending on which CloudFront edge answers. See NHC_GIS.
+    NHC_GIS + id + "_5day_" + adv + ".zip"
+  ];
+
+  let lastErr = null;
+  for(const url of urls){
+    try{
+      const r = await fetchT(url, 20000);
+      if(!r.ok) throw new Error("cone " + r.status);
+      const files = await unzip(await r.arrayBuffer());
+      const pick = suf => Object.keys(files).find(k => k.endsWith(suf));
+      const pgn = pick("_pgn.shp"), lin = pick("_lin.shp"), pts = pick("_pts.shp"), ptsDbf = pick("_pts.dbf");
+      const out = { cone:null, track:null, pts:[] };
+      if(pgn){
+        const s = parseShp(files[pgn]).filter(x => x.parts);
+        // The cone is one polygon; take its largest ring, which is the outline.
+        // (Rings can include islands where the cone crosses land in some products.)
+        let best = null;
+        for(const sh of s) for(const ring of sh.parts) if(!best || ring.length > best.length) best = ring;
+        out.cone = best;
+      }
+      if(lin) out.track = parseShp(files[lin]).filter(x => x.parts).flatMap(x => x.parts);
+      if(pts && ptsDbf){
+        const geo = parseShp(files[pts]);
+        const att = parseDbf(files[ptsDbf]);
+        out.pts = geo.map((g, i) => Object.assign({ lng:g.pts[0][0], lat:g.pts[0][1] }, att[i] || {}));
+      }
+      if(!out.cone && !out.pts.length) throw new Error("zip held no cone or track points");
+      return out;
+    }catch(e){ lastErr = e; }
+  }
+  throw lastErr || new Error("no cone URL");
+}
+
+/* Point-in-polygon, ray casting. Used only to answer "is Ponce Inlet inside the
+   cone" — a blunt question that deserves a blunt answer, and one worth stating
+   because the cone is the single number everyone looks at first.
+
+   NOTE, and it matters: the cone is where the CENTRE may go, two times out of
+   three. It is not the extent of the storm, and being outside it is not safety.
+   The card says so every time it says anything about the cone. */
+function inPolygon(pt, ring){
+  if(!ring || ring.length < 3) return false;
+  let inside = false;
+  for(let i = 0, j = ring.length - 1; i < ring.length; j = i++){
+    const xi = ring[i][0], yi = ring[i][1], xj = ring[j][0], yj = ring[j][1];
+    if(((yi > pt[1]) !== (yj > pt[1])) &&
+       (pt[0] < (xj - xi)*(pt[1] - yi)/(yj - yi) + xi)) inside = !inside;
+  }
+  return inside;
+}
+
+/* =====================================================================
+   VOLUSIA COUNTY — your zone, and where to go
+
+   All CORS-open. Zones are polygons over LAND, so a point in the middle of the
+   river answers nothing; that is correct behaviour, not a failure, and the card
+   says so rather than showing an empty result.
+   ===================================================================== */
+let zone = null, zoneErr = null;
+
+function vcQuery(layer, params){
+  const qs = Object.assign({ f:"json", outFields:"*", returnGeometry:"false" }, params);
+  const s = Object.keys(qs).map(k => encodeURIComponent(k) + "=" + encodeURIComponent(qs[k])).join("&");
+  return fetchT(VC_BASE + "/" + layer + "/query?" + s, 12000).then(r => {
+    if(!r.ok) throw new Error("Volusia GIS " + r.status);
+    return r.json();
+  }).then(d => {
+    if(d.error) throw new Error(d.error.message || "Volusia GIS error");
+    return d.features || [];
+  });
+}
+const atPoint = (layer, lat, lng) => vcQuery(layer, {
+  geometry: lng + "," + lat, geometryType:"esriGeometryPoint", inSR:"4326",
+  spatialRel:"esriSpatialRelIntersects"
+});
+
+async function fetchZone(lat, lng){
+  const [ez, sz, sh, sb] = await Promise.all([
+    atPoint(VC_LAYER.evaczone, lat, lng).catch(() => []),
+    atPoint(VC_LAYER.surgezone, lat, lng).catch(() => []),
+    // Shelters and sandbag sites are county-wide point layers, small enough to
+    // pull whole and sort by distance here rather than run a spatial query per
+    // open of the card.
+    //
+    // outSR=4326 IS LOAD BEARING. Without it ArcGIS returns geometry in the
+    // layer's own spatial reference — Web Mercator metres — and distNm happily
+    // treats those metres as degrees. The first run put the nearest shelter 928
+    // nm away and the list was still sorted and still plausible-looking, which
+    // is the worst way for a units bug to present.
+    vcQuery(VC_LAYER.shelters, { where:"1=1", returnGeometry:"true", outSR:"4326" }).catch(() => []),
+    vcQuery(VC_LAYER.sandbags, { where:"1=1", returnGeometry:"true", outSR:"4326" }).catch(() => [])
+  ]);
+  const near = (feats, n) => feats
+    .filter(f => f.geometry && isFinite(f.geometry.y))
+    .map(f => Object.assign({ nm: distNm({lat,lng}, {lat:f.geometry.y, lng:f.geometry.x}) }, f.attributes))
+    .sort((a,b) => a.nm - b.nm).slice(0, n);
+  return {
+    lat, lng,
+    evac:  ez.length ? (ez[0].attributes.EvacZone || null) : null,
+    surge: sz.length ? (sz[0].attributes.CAT || null) : null,
+    shelters: near(sh, 4),
+    sandbags: near(sb, 3)
+  };
+}
+
+/* =====================================================================
+   THE CHECKLIST — trailer / haul-out
+
+   Grouped by how far ahead of tropical-storm-force wind each job has to be
+   done, because that is the only ordering that survives a forecast changing:
+   when the wind arrives sooner, the groups do not move, the clock does.
+
+   Every item carries a WHY. A checklist with no reasons gets skipped the one
+   time it matters, and half of these are things people learn by losing a boat.
+   ===================================================================== */
+const CHECKLIST = [
+  { g:"72 hours out", id:"fuel",     t:"Fill the tow vehicle and the boat's tank",
+    w:"Stations run dry and lose power early. A full boat tank also cuts condensation in the tank." },
+  { g:"72 hours out", id:"trailer",  t:"Check trailer tyres, bearings, lights and the spare",
+    w:"The trailer has probably sat since the last trip. A bearing that seizes on the road is how a haul-out becomes an evacuation on foot." },
+  { g:"72 hours out", id:"where",    t:"Decide WHERE the boat goes and confirm you can get in",
+    w:"Inland and out of the surge zone, away from trees and power lines. Storage yards fill up days ahead and stop taking boats." },
+  { g:"72 hours out", id:"photos",   t:"Photograph the boat, motor, trailer and serial numbers",
+    w:"Insurance. Do it before the damage, in daylight, and put the photos somewhere off the phone." },
+  { g:"72 hours out", id:"papers",   t:"Registration, insurance policy and hull ID somewhere dry and portable",
+    w:"A claim moves fast when the paperwork is in hand and slowly when it is in a wet drawer." },
+
+  { g:"48 hours out", id:"ramp",     t:"Check ramp closures and pick your pull window",
+    w:"County and city ramps close ahead of the storm, and the water card above tells you when the ramp itself is under water." },
+  { g:"48 hours out", id:"pull",     t:"Pull the boat — do not leave it for the last clear day",
+    w:"Everyone else is at the ramp on the last clear day, and squalls arrive well ahead of the centre." },
+  { g:"48 hours out", id:"drain",    t:"Pull the drain plug and leave it out",
+    w:"A boat left plugged fills with rain and the weight breaks the trailer, the axle or both. The single most common trailer-boat loss in a storm." },
+  { g:"48 hours out", id:"cover",    t:"Strip or lash canvas, bimini, covers and electronics",
+    w:"Canvas is a sail. It will destroy its own frame first and take the windshield with it." },
+
+  { g:"24 hours out", id:"strap",    t:"Strap the hull to the trailer at bow and stern — not just the winch strap",
+    w:"The winch strap holds the boat forward, not down. Transom straps are what keep it on the trailer in a gust." },
+  { g:"24 hours out", id:"tiedown",  t:"Tie the TRAILER down to the ground or something heavy",
+    w:"A boat and trailer together are light for their sail area and will walk, or flip, in hurricane-force wind." },
+  { g:"24 hours out", id:"blocks",   t:"Block or crib the trailer and let some air out of the tyres",
+    w:"Lowers the centre of gravity and stops it rolling. Do not jack it off its wheels — it needs to be able to settle." },
+  { g:"24 hours out", id:"loose",    t:"Clear the yard: anything loose becomes a missile",
+    w:"Fenders, jack stands, fuel cans, the grill. This is also the wind that puts a chair through your own window." },
+
+  { g:"Last daylight", id:"battery", t:"Disconnect and remove the batteries",
+    w:"Salt water plus a connected battery is a fire. Take them somewhere dry — you will want the charge afterwards." },
+  { g:"Last daylight", id:"vent",    t:"Leave the boat vented but not open to rain",
+    w:"A sealed hull sweats and grows mould for a month; an open one fills." },
+  { g:"Last daylight", id:"final",   t:"Final walk-round in daylight, then stop",
+    w:"Anything you have not done by dark you are not going to do safely. Tropical-storm-force wind is the deadline this app counts to, and it is not the arrival of the storm — it is the end of your working time outdoors." }
+];
+
+/* =====================================================================
+   RENDER
+   ===================================================================== */
+function threatOf(){
+  // The badge on the whole page. Alerts outrank everything because they are the
+  // official word; the cone and the wind forecast are our own reading.
+  if(alerts && alerts.length){
+    const ev = alerts.map(a => a.event.toLowerCase()).join(" ");
+    if(/hurricane warning|storm surge warning/.test(ev)) return "sever";
+    if(/hurricane watch|tropical storm warning|storm surge watch/.test(ev)) return "warn";
+    if(/tropical storm watch|coastal flood|high wind/.test(ev)) return "watch";
+  }
+  const ts = firstAbove(TS_FORCE_MPH);
+  if(ts) return "warn";
+  if(storms && storms.length) return "watch";
+  return "calm";
+}
+
+function alertsHTML(){
+  if(!alerts || !alerts.length) return "";
+  return alerts.map(a => `
+    <div class="warnblock">
+      <div class="hd">${esc(a.event)}</div>
+      <p>${esc(a.headline || a.area)}</p>
+      ${a.to ? `<p class="note">In force until ${esc(fmtDT(a.to))}</p>` : ""}
+    </div>`).join("");
+}
+
+/* ---- The tropics card ---- */
+function coneSVG(cone, track, pts){
+  // Equirectangular, scaled so the cone AND Ponce Inlet are both on the page.
+  // No tiles and no basemap: this is a picture of where the centre may go
+  // relative to home, not a chart, and pretending otherwise by drawing a
+  // coastline we have not verified would be worse than drawing none.
+  const all = [];
+  if(cone) all.push(...cone);
+  if(track) for(const seg of track) all.push(...seg);
+  for(const p of pts) all.push([p.lng, p.lat]);
+  all.push([INLET.lng, INLET.lat]);
+  if(all.length < 3) return "";
+
+  let x0 = Math.min(...all.map(p => p[0])), x1 = Math.max(...all.map(p => p[0]));
+  let y0 = Math.min(...all.map(p => p[1])), y1 = Math.max(...all.map(p => p[1]));
+  const padX = Math.max((x1-x0)*0.06, 0.4), padY = Math.max((y1-y0)*0.06, 0.4);
+  x0 -= padX; x1 += padX; y0 -= padY; y1 += padY;
+  const midLat = (y0+y1)/2, kx = Math.cos(midLat*Math.PI/180);
+  const W = 640, H = Math.max(200, Math.min(460, Math.round(W*((y1-y0)/((x1-x0)*kx)))));
+  const X = lng => (lng - x0)/(x1 - x0)*W;
+  const Y = lat => H - (lat - y0)/(y1 - y0)*H;
+  const path = ring => ring.map((p,i) => (i ? "L" : "M") + X(p[0]).toFixed(1) + " " + Y(p[1]).toFixed(1)).join("");
+
+  let s = `<svg class="cone" viewBox="0 0 ${W} ${H}" role="img" aria-label="Forecast cone relative to Ponce Inlet">`;
+  s += `<rect width="${W}" height="${H}" fill="#DCE6EE"/>`;
+  if(cone) s += `<path d="${path(cone)}Z" fill="rgba(178,58,43,.16)" stroke="#B23A2B" stroke-width="1.6"/>`;
+  if(track) for(const seg of track){
+    s += `<path d="${path(seg)}" fill="none" stroke="#0E1F2E" stroke-width="2" stroke-dasharray="6 4"/>`;
+  }
+  for(const p of pts){
+    const cx = X(p.lng).toFixed(1), cy = Y(p.lat).toFixed(1);
+    const cat = ssCat(parseFloat(p.MAXWIND));
+    s += `<circle cx="${cx}" cy="${cy}" r="7" fill="${cat.fill}" stroke="#FFFFFF" stroke-width="2"/>`;
+    s += `<text x="${cx}" y="${(+cy + 3.4).toFixed(1)}" font-family="monospace" font-size="9" font-weight="700"
+           text-anchor="middle" fill="#FFFFFF">${esc(cat.mark)}</text>`;
+  }
+  // Home last so it is never buried under the storm.
+  const hx = X(INLET.lng).toFixed(1), hy = Y(INLET.lat).toFixed(1);
+  s += `<g><circle cx="${hx}" cy="${hy}" r="6.5" fill="#1B6F3B" stroke="#FFFFFF" stroke-width="2.5"/>`;
+  s += `<text x="${hx}" y="${(+hy - 12).toFixed(1)}" font-family="monospace" font-size="12" font-weight="700"
+         text-anchor="middle" fill="#0E1F2E" stroke="#FFFFFF" stroke-width="3.5" paint-order="stroke">PONCE</text></g>`;
+  s += `</svg>`;
+  return s;
+}
+/* Saffir-Simpson from sustained wind in mph, plus the mark drawn in the dot.
+   D/S are depression and storm; 1-5 are hurricane categories. */
+function ssCat(mph){
+  if(!isFinite(mph))  return { mark:"?", fill:"#5C6B78", label:"unknown" };
+  if(mph < 39)  return { mark:"D", fill:"#5C6B78", label:"depression" };
+  if(mph < 74)  return { mark:"S", fill:"#B87E00", label:"tropical storm" };
+  if(mph < 96)  return { mark:"1", fill:"#B4530C", label:"Category 1" };
+  if(mph < 111) return { mark:"2", fill:"#B4530C", label:"Category 2" };
+  if(mph < 130) return { mark:"3", fill:"#B23A2B", label:"Category 3" };
+  if(mph < 157) return { mark:"4", fill:"#8C1F14", label:"Category 4" };
+  return { mark:"5", fill:"#6B140C", label:"Category 5" };
+}
+
+function tropicsHTML(){
+  let s = `<div class="card" id="tropics"><div class="card-head">
+    <div class="card-title">The tropics<span class="sub">National Hurricane Center</span></div>`;
+  if(stormsErr){
+    s += `<div class="badge watch">unknown</div></div><div class="body">
+      <p>Couldn't reach the National Hurricane Center (${esc(stormsErr)}).</p>
+      <p class="note">This is the one card that must never be read as "all clear" when it fails.
+         Check hurricanes.gov directly.</p></div></div>`;
+    return s;
+  }
+  if(storms === null){
+    s += `</div><div class="body"><p class="note">Checking&hellip;</p></div></div>`;
+    return s;
+  }
+  if(!storms.length){
+    s += `<div class="badge calm">none active</div></div><div class="body">
+      <p>No active tropical cyclones in the Atlantic basin right now.</p>
+      <p class="note">Checked live against the NHC's own active-storm list. The Atlantic season
+         runs 1 June to 30 November, and the Florida peak is mid-August to early October.</p>
+      </div></div>`;
+    return s;
+  }
+
+  s += `<div class="badge warn">${storms.length} active</div></div><div class="body">`;
+  for(const st of storms){
+    const pos = { lat: parseFloat(st.latitudeNumeric), lng: parseFloat(st.longitudeNumeric) };
+    const wind = parseFloat(st.intensity);            // NHC publishes intensity in knots
+    const mph = isFinite(wind) ? wind*1.15078 : NaN;
+    const cat = ssCat(mph);
+    const name = titleCase(st.name || st.id || "Unnamed");
+    s += `<div class="rule"><p><strong>${esc(name)}</strong> &mdash; ${esc(cat.label)}`;
+    if(isFinite(mph)) s += `, ${Math.round(mph)} mph sustained`;
+    s += `.</p>`;
+    if(isFinite(pos.lat) && isFinite(pos.lng)){
+      const nm = distNm(INLET, pos), br = bearing(INLET, pos);
+      s += `<p class="note">${nm.toFixed(0)} nm ${esc(degToCompass(br))} of Ponce Inlet`;
+      if(isFinite(st.movementDir) && isFinite(st.movementSpeed)){
+        s += ` &middot; moving ${esc(degToCompass(st.movementDir))} at ${st.movementSpeed} kt`;
+      }
+      s += `</p>`;
+    }
+    const c = coneCache[st.id];
+    if(c === undefined){
+      s += `<p class="note">Loading the forecast cone&hellip;</p>`;
+    }else if(c === 'err'){
+      s += `<p class="note">Forecast cone unavailable. The storm details above are still live.</p>`;
+    }else{
+      const inside = c.cone ? inPolygon([INLET.lng, INLET.lat], c.cone) : null;
+      if(inside !== null){
+        s += inside
+          ? `<p><strong>Ponce Inlet is inside the forecast cone.</strong></p>`
+          : `<p>Ponce Inlet is outside the forecast cone.</p>`;
+      }
+      s += `<p class="note">The cone is where the CENTRE may track, about two times out of three.
+            It is not how big the storm is, and being outside it is not safety &mdash; surge, wind
+            and rain reach well beyond it.</p>`;
+      s += `</div>${coneSVG(c.cone, c.track, c.pts)}<div class="body">`;
+      if(c.pts.length){
+        s += `<div class="wrapx"><table class="grid"><thead><tr>
+          <th>Forecast</th><th class="num">Wind</th><th class="num">Gust</th><th class="num">From Ponce</th>
+          </tr></thead><tbody>`;
+        for(const p of c.pts){
+          const w = parseFloat(p.MAXWIND), g = parseFloat(p.GUST);
+          const nm = distNm(INLET, { lat:parseFloat(p.lat), lng:parseFloat(p.lng) });
+          s += `<tr><td>${esc(p.FLDATELBL || p.DATELBL || ("+" + p.TAU + " h"))}</td>
+            <td class="num">${isFinite(w) ? Math.round(w*1.15078) + " mph" : "&mdash;"}</td>
+            <td class="num">${isFinite(g) && g < 9000 ? Math.round(g*1.15078) + " mph" : "&mdash;"}</td>
+            <td class="num">${isFinite(nm) ? nm.toFixed(0) + " nm" : "&mdash;"}</td></tr>`;
+        }
+        s += `</tbody></table></div>`;
+        s += `<p class="note">Wind figures are the NHC's, converted from knots. Distances are from the
+              forecast centre position to Ponce Inlet.</p>`;
+      }
+    }
+    s += `</div>`;
+  }
+  s += `</div></div>`;
+  return s;
+}
+
+/* ---- The water card: the headline ---- */
+function waterHTML(){
+  const badge = surgeErr ? `<div class="badge watch">no surge feed</div>` : `<div class="badge water">MLLW</div>`;
+  let s = `<div class="card" id="water"><div class="card-head">
+    <div class="card-title">The water at your spots<span class="sub">tide + surge, feet above MLLW</span></div>
+    ${badge}</div><div class="body">`;
+
+  if(!preds.length){
+    s += `<p>No tide predictions, so no still-water forecast. ${esc(predsErr || "")}</p></div></div>`;
+    return s;
+  }
+  if(surgeErr){
+    s += `<p>The surge forecast is unavailable (${esc(surgeErr)}), so these are ASTRONOMICAL TIDE
+          HEIGHTS ONLY &mdash; the tide as if there were no storm.</p>`;
+  }
+
+  s += `<div class="wrapx"><table class="grid"><thead><tr>
+    <th>Spot</th><th class="num">Peak water</th><th>When</th><th class="num">Of which surge</th><th>Yours</th>
+    </tr></thead><tbody>`;
+
+  const visible = LOCATIONS;
+  for(const loc of visible){
+    const th = thresholds[loc.key];
+    const thFt = th && isFinite(th.ft) ? th.ft : null;
+    const o = spotOutlook(loc, thFt);
+    if(!o || !o.peak){
+      s += `<tr><td>${esc(loc.name)}</td><td class="num">&mdash;</td><td>&mdash;</td><td class="num">&mdash;</td>
+            <td><button class="btn small" onclick="editThreshold('${esc(loc.key)}')">set</button></td></tr>`;
+      continue;
+    }
+    const over = thFt != null && o.peak.total >= thFt;
+    const near = !over && thFt != null && o.peak.total >= thFt - 0.5;
+    /* Two DIFFERENT weaknesses, and they must not be collapsed into one word.
+       "est lag" means the arrival TIME is interpolated rather than timed.
+       "inlet heights" means there is no measured height model at all, so the
+       swing shown is the inlet's own — which OVERSTATES the range well up the
+       creeks, where the water moves about half what it does at the inlet. That
+       is exactly the error WTF's V101 work existed to fix, and without this tag
+       five unscaled spots print the same number and look like a broken table
+       instead of an honest one. */
+    const unscaled = !isFinite(loc.hs);
+    const tags = [];
+    if(unscaled) tags.push("inlet heights");
+    if(!loc.measured) tags.push("est lag");
+    s += `<tr class="${over ? "over" : (near ? "near" : "")}">
+      <td>${esc(loc.name)}${tags.length ? ` <span class="note">${esc(tags.join(", "))}</span>` : ""}</td>
+      <td class="num"><strong>${o.peak.total.toFixed(1)} ft</strong></td>
+      <td>${esc(fmtDT(o.peak.t))}</td>
+      <td class="num">${o.peak.surge == null ? "&mdash;" : (o.peak.surge >= 0 ? "+" : "") + o.peak.surge.toFixed(1) + " ft"}</td>
+      <td>${thFt == null
+            ? `<button class="btn small" onclick="editThreshold('${esc(loc.key)}')">set</button>`
+            : `<button class="btn small" onclick="editThreshold('${esc(loc.key)}')">${thFt.toFixed(1)} ft</button>`}</td>
+    </tr>`;
+    if(thFt != null && o.first){
+      s += `<tr class="${over ? "over" : ""}"><td colspan="5" class="note">
+        &nbsp;&nbsp;${esc(th.label || "your mark")} at ${thFt.toFixed(1)} ft is under water from
+        <strong>${esc(fmtDT(o.first))}</strong> to <strong>${esc(fmtDT(o.last))}</strong>.</td></tr>`;
+    }
+  }
+  s += `</tbody></table></div>`;
+
+  if(visible.some(l => !isFinite(l.hs))){
+    s += `<p class="note"><strong>Spots tagged "inlet heights" have no measured height model</strong>,
+          so they are shown with the INLET's tide range, only shifted in time &mdash; which is why
+          several read the same. The real swing well up these creeks is roughly half the inlet's
+          (DJM 0.59, Dunlawton 0.536), so for those spots the tide half of the number is too big.
+          The surge half is not affected.</p>`;
+  }
+  if(surge){
+    s += `<p class="note">Surge forecast runs to ${esc(fmtDT(surge.end))}; nothing beyond that is
+          shown rather than held flat. Surge is carried from the inlet to each spot delayed by that
+          spot's own tide lag and multiplied by ${surgeTransfer.toFixed(2)}
+          <button class="btn small" onclick="editTransfer()">change</button></p>`;
+  }
+  s += `<details class="help"><summary>What these numbers are, and are not</summary><div class="body2">
+    <p><strong>This is still water, not the water you will see.</strong> It is the astronomical tide
+    for that spot plus the forecast surge. It does not include waves, and it does not include the
+    rain running off the land into these creeks, which in a wet tropical system can matter more here
+    than the surge does.</p>
+    <p><strong>The tide half is measured; the surge half is modelled.</strong> The tide comes from
+    NOAA station 8721138 carried to your spot by the lag and height scaling My Tides has measured for
+    it &mdash; spots marked <em>est</em> have an estimated lag rather than a measured one. The surge
+    comes from P-ETSS at the inlet. There is NO water level gauge at Ponce, so the surge here can be
+    forecast but never checked against a reading; the nearest real gauges are 54 nm south at Trident
+    Pier and 100 nm north at Mayport.</p>
+    <p><strong>Why the surge is not damped like the tide.</strong> The water at DJM swings about 0.59
+    of what the inlet does, and it is tempting to shrink the surge by the same amount. That would be
+    wrong. Friction takes more out of a fast wave than a slow one, and a surge is a much longer wave
+    than the twice-daily tide, so it runs up these creeks close to undamped &mdash; and a dead-end bay
+    with the wind blowing straight up it can end up HIGHER than the open coast. So the default is 1.0,
+    which is a middle estimate and not a safe one.</p>
+    <p><strong>Set your own mark.</strong> Tap <em>set</em> against a spot and enter the height above
+    MLLW of the thing you actually care about &mdash; the dock deck, the ramp apron, the yard, the
+    lowest point of the road out. Then the table tells you when that goes under, instead of telling
+    you a number you have to do arithmetic on. If you do not know the height, measure it once at a
+    known low water and it is good forever.</p>
+    <p>PLANNING PURPOSES ONLY. DO NOT USE THIS APP FOR NAVIGATION.</p>
+  </div></details>`;
+  s += `</div></div>`;
+  return s;
+}
+
+/* ---- The clock ---- */
+function clockHTML(){
+  const ts = firstAbove(TS_FORCE_MPH);
+  const hu = firstAbove(HURR_FORCE_MPH);
+  const cls = hu ? "sever" : (ts ? "warn" : "calm");
+  let s = `<div class="card ${ts ? (hu ? "alarm" : "rising") : ""}" id="clock"><div class="card-head">
+    <div class="card-title">The clock<span class="sub">time left to work outside</span></div>
+    <div class="badge ${cls}">${hu ? "hurricane force" : (ts ? "tropical storm force" : "no TS wind forecast")}</div>
+    </div><div class="body">`;
+
+  if(wxErr){
+    s += `<p>No wind forecast (${esc(wxErr)}), so there is no countdown. </p>
+          <p class="note">Do not read a missing forecast as time in hand.</p></div></div>`;
+    return s;
+  }
+  if(!wx){ s += `<p class="note">Loading the wind forecast&hellip;</p></div></div>`; return s; }
+
+  if(!ts){
+    const pk = peakWind();
+    s += `<p>The forecast does not reach tropical-storm-force wind (${TS_FORCE_MPH} mph) anywhere in
+          the next week.</p>`;
+    if(pk) s += `<p class="note">Strongest in the forecast: ${Math.round(pk.v)} mph ${esc(pk.kind)},
+                 ${esc(fmtDT(pk.t))}.</p>`;
+    s += `<p class="note">The forecast grid runs about seven days. A storm still five days out will not
+          show up here yet &mdash; the tropics card above is the earlier warning.</p>`;
+  }else{
+    const deadline = new Date(ts.t.getTime() - leadHours*3600000);
+    const u = until(deadline - Date.now());
+    s += `<div class="clock ${cls}"><div class="big">${esc(u.n)}</div><div class="unit">${esc(u.u)} to finish</div></div>`;
+    s += `<p>Tropical-storm-force wind (${TS_FORCE_MPH} mph ${esc(ts.kind)}) arrives about
+          <strong>${esc(fmtDT(ts.t))}</strong>. Working back your
+          <button class="btn small" onclick="editLead()">${leadHours} h</button> of lead time puts your
+          deadline at <strong>${esc(fmtDT(deadline))}</strong>.</p>`;
+    if(hu){
+      s += `<p><strong>Hurricane-force wind (${HURR_FORCE_MPH} mph) is in the forecast</strong> from about
+            ${esc(fmtDT(hu.t))}.</p>`;
+    }
+    if(deadline <= Date.now()){
+      s += `<div class="warnblock"><div class="hd">Past your deadline</div>
+            <p>Finish what is safe to finish and stop. Nothing on a boat is worth being outside in this.</p></div>`;
+    }
+  }
+  s += `<p class="note">From the NWS Melbourne forecast grid for the inlet cell, sustained wind and
+        gusts, whichever crosses first &mdash; a gust will take a boat off a trailer just as well as a
+        sustained wind${wx.updated ? ", forecast issued " + esc(ago(Date.now() - wx.updated.getTime())) : ""}.</p>`;
+  s += `</div></div>`;
+  return s;
+}
+
+/* ---- Your zone ---- */
+function zoneHTML(){
+  let s = `<div class="card" id="zone"><div class="card-head">
+    <div class="card-title">Your zone<span class="sub">Volusia County Emergency Management</span></div>`;
+  s += zone && zone.evac ? `<div class="badge warn">Zone ${esc(zone.evac)}</div>`
+                         : `<div class="badge watch">not set</div>`;
+  s += `</div><div class="body">`;
+
+  if(!here){
+    s += `<p>Evacuation zones are set by where your house is, not where your boat is.</p>
+          <div class="btnrow">
+            <button class="btn" onclick="locateHere()">Use my location</button>
+            <button class="btn" onclick="typeHere()">Type a position</button>
+          </div>`;
+  }else if(zoneErr){
+    s += `<p>Couldn't reach Volusia County GIS (${esc(zoneErr)}).</p>
+          <div class="btnrow"><button class="btn" onclick="refreshZone()">Try again</button></div>`;
+  }else if(!zone){
+    s += `<p class="note">Looking up the zone&hellip;</p>`;
+  }else{
+    if(zone.evac){
+      s += `<p>That position is in <strong>evacuation zone ${esc(zone.evac)}</strong>`;
+      s += zone.surge ? `, inside the <strong>Category ${esc(zone.surge)}</strong> storm surge zone.</p>` : `.</p>`;
+      s += `<p class="note">Zones are called by letter, A first. An order for Zone A does not include
+            you unless your letter is named. The county is the authority &mdash; this is a lookup of
+            their published map, not an instruction.</p>`;
+    }else{
+      s += `<p>No evacuation zone covers that position. The zones are drawn over LAND, so a position in
+            the middle of the river answers nothing &mdash; use your house.</p>`;
+    }
+    if(zone.shelters.length){
+      s += `<p class="note" style="margin-top:8px"><strong>Nearest shelters</strong></p>
+            <div class="wrapx"><table class="grid"><tbody>`;
+      for(const sh of zone.shelters){
+        const open = String(sh.OPEN_ || "").toUpperCase() === "Y";
+        s += `<tr><td>${esc(titleCase(sh.NAME || ""))}<br><span class="note">${esc(titleCase(sh.ADDRESS || ""))},
+              ${esc(titleCase(sh.CITYNAME || ""))}${sh.SHLTR_TYPE ? " &middot; " + esc(titleCase(sh.SHLTR_TYPE)) : ""}</span></td>
+              <td class="num">${sh.nm.toFixed(1)} nm<br><span class="note">${open ? "OPEN" : "closed"}</span></td></tr>`;
+      }
+      s += `</tbody></table></div>
+            <p class="note">Open/closed is the county's own flag. Shelters open late and selectively;
+            most are closed most of the time, and a shelter's description field can still carry text
+            from a PREVIOUS storm's activation, so believe the flag and confirm with the county
+            before you drive.</p>`;
+    }
+    if(zone.sandbags.length){
+      s += `<p class="note" style="margin-top:8px"><strong>Nearest sandbag sites</strong></p>
+            <div class="wrapx"><table class="grid"><tbody>`;
+      for(const sb of zone.sandbags){
+        s += `<tr><td>${esc(titleCase(sb.NAME || ""))}<br><span class="note">${esc(titleCase(sb.ADDRESS || ""))}${sb.Hours_Oper ? " &middot; " + esc(sb.Hours_Oper) : ""}</span></td>
+              <td class="num">${sb.nm.toFixed(1)} nm</td></tr>`;
+      }
+      s += `</tbody></table></div>`;
+    }
+    s += `<div class="btnrow">
+            <button class="btn small" onclick="locateHere()">Update location</button>
+            <button class="btn small" onclick="typeHere()">Type a position</button>
+          </div>`;
+  }
+  s += `</div></div>`;
+  return s;
+}
+
+/* ---- Checklist ---- */
+function checklistHTML(){
+  const done = CHECKLIST.filter(c => checks[c.id]).length;
+  let s = `<div class="card" id="checklist"><div class="card-head">
+    <div class="card-title">Haul-out<span class="sub">boat on a trailer</span></div>
+    <div class="badge ${done === CHECKLIST.length ? "calm" : "watch"}">${done}/${CHECKLIST.length}</div>
+    </div><div class="body">`;
+  let g = null;
+  for(const c of CHECKLIST){
+    if(c.g !== g){ g = c.g; s += `<div class="grouphd">${esc(g)}</div>`; }
+    const on = !!checks[c.id];
+    s += `<label class="chk ${on ? "done" : ""}">
+      <input type="checkbox" ${on ? "checked" : ""} onchange="toggleCheck('${esc(c.id)}',this.checked)">
+      <span class="txt">${esc(c.t)}<span class="why">${esc(c.w)}</span></span></label>`;
+  }
+  s += `<div class="btnrow"><button class="btn small" onclick="resetChecks()">Clear all</button></div>`;
+  s += `<p class="note" style="margin-top:8px">Groups are set by how far ahead of tropical-storm-force
+        wind each job has to be done, not by calendar date &mdash; when the forecast moves, the clock
+        above moves and the list does not.</p>`;
+  s += `</div></div>`;
+  return s;
+}
+
+let predsErr = null;
+function render(){
+  const el = document.getElementById("content");
+  if(!el) return;
+  el.innerHTML = alertsHTML() + clockHTML() + waterHTML() + tropicsHTML() + zoneHTML() + checklistHTML();
+  const t = threatOf();
+  document.getElementById("subLine").innerHTML =
+    `Ponce de Leon Inlet &amp; the Halifax River &middot; <span class="badge ${t}">${
+      t === "calm" ? "nothing active" : t === "watch" ? "watching" : t === "warn" ? "get ready" : "act now"
+    }</span>`;
+}
+
+/* =====================================================================
+   ACTIONS
+   ===================================================================== */
+function toggleCheck(id, on){ if(on) checks[id] = true; else delete checks[id]; saveChecks(); render(); }
+function resetChecks(){
+  if(!confirm("Clear every tick on the haul-out list?")) return;
+  checks = {}; saveChecks(); render();
+}
+function editThreshold(key){
+  const loc = LOCATIONS.find(l => l.key === key);
+  if(!loc) return;
+  const cur = thresholds[key] || {};
+  const raw = prompt(
+    "Height above MLLW, in feet, of the thing you want to know about at " + loc.name +
+    ".\n\nThe dock deck, the ramp apron, the yard, the low point of the road out — whatever you\n" +
+    "actually care about. Measure it once at a known low water and it is good forever.\n\n" +
+    "Leave blank to clear.", cur.ft != null ? String(cur.ft) : "");
+  if(raw === null) return;
+  if(raw.trim() === ""){ delete thresholds[key]; saveThresholds(); render(); return; }
+  const ft = parseFloat(raw);
+  if(!isFinite(ft)){ alert("That is not a number of feet."); return; }
+  const label = prompt("What is it? (dock, ramp, yard…)", cur.label || "dock") || "your mark";
+  thresholds[key] = { ft, label };
+  saveThresholds(); render();
+}
+function editLead(){
+  const raw = prompt(
+    "How many hours before tropical-storm-force wind do you want to be FINISHED?\n\n" +
+    "24 is a common answer for a trailer boat: it leaves a working day of margin for a ramp\n" +
+    "queue, a seized bearing, or the forecast moving forward.", String(leadHours));
+  if(raw === null) return;
+  const v = parseFloat(raw);
+  if(!(v >= 0 && v <= 96)){ alert("Give a number of hours between 0 and 96."); return; }
+  leadHours = v; lsSet(LS.lead, String(v)); render();
+}
+function editTransfer(){
+  const raw = prompt(
+    "How much of the inlet's surge reaches your spots? 1.0 means all of it.\n\n" +
+    "The default is 1.0 and that is a MIDDLE estimate, not a safe one: a surge is a long, slow\n" +
+    "wave and runs up these creeks close to undamped, and a dead-end bay with the wind up it can\n" +
+    "go higher than the open coast. Do not set this to the tide's damping factor — that is a\n" +
+    "different thing entirely.", surgeTransfer.toFixed(2));
+  if(raw === null) return;
+  const v = parseFloat(raw);
+  if(!(v > 0.2 && v <= 2)){ alert("Give a factor between 0.2 and 2."); return; }
+  surgeTransfer = v; lsSet(LS.transfer, String(v)); render();
+}
+
+function setHere(lat, lng, acc){
+  here = { lat, lng, acc: acc || null, when: Date.now() };
+  lsSet(LS.here, JSON.stringify(here));
+  zone = null; zoneErr = null; render();
+  refreshZone();
+}
+function refreshZone(){
+  if(!here) return;
+  zoneErr = null;
+  fetchZone(here.lat, here.lng)
+    .then(z => { zone = z; zoneErr = null; })
+    .catch(e => { zoneErr = e.message; })
+    .then(render);
+}
+function locateHere(){
+  if(!navigator.geolocation){ alert("This device offers no location."); return; }
+  navigator.geolocation.getCurrentPosition(
+    p => setHere(p.coords.latitude, p.coords.longitude, p.coords.accuracy),
+    e => alert("Couldn't get a location: " + e.message),
+    { enableHighAccuracy:true, timeout:15000, maximumAge:60000 });
+}
+/* Degrees-and-decimal-minutes in whatever shape a person types it, the same
+   parser rule Mini Mapper settled on: accept everything, and IMPOSE the sign
+   (north latitude, west longitude) rather than trusting a typed one. Getting a
+   minus sign wrong puts you in the Indian Ocean, and the app knows perfectly
+   well which hemisphere Volusia County is in. */
+function parseDDM(s){
+  const nums = String(s).replace(/[^\d.]+/g, " ").trim().split(/\s+/).map(Number).filter(n => isFinite(n));
+  if(nums.length === 1){                       // "2902.580" packed form
+    const v = nums[0];
+    const d = Math.floor(v/100), m = v - d*100;
+    return d + m/60;
+  }
+  if(nums.length >= 2) return nums[0] + nums[1]/60;
+  return NaN;
+}
+function typeHere(){
+  const la = prompt("Latitude, degrees and decimal minutes.\nAny of  29 02.580   2902.580   29°02.580'N  will do.",
+                    here ? "" : "29 01.9");
+  if(la === null) return;
+  const lo = prompt("Longitude, degrees and decimal minutes (west is assumed).", here ? "" : "80 56.8");
+  if(lo === null) return;
+  const lat = Math.abs(parseDDM(la)), lng = -Math.abs(parseDDM(lo));
+  if(!isFinite(lat) || !isFinite(lng)){ alert("Couldn't read that as a position."); return; }
+  if(lat < 28 || lat > 30.5 || lng < -82 || lng > -80){
+    if(!confirm("That is outside Volusia County. Use it anyway?")) return;
+  }
+  setHere(lat, lng, null);
+}
+
+/* =====================================================================
+   BOOT
+
+   Every feed is loaded independently and every one of them renders on both
+   success AND failure. A storm app that blanks because one service is busy is
+   worse than useless, and during a real storm these services are under load
+   from the whole east coast at once.
+   ===================================================================== */
+function loadAll(){
+  fetchWx().then(w => { wx = w; wxErr = null; }).catch(e => { wxErr = e.message; }).then(render);
+  fetchAlerts().then(a => { alerts = a; }).catch(() => { alerts = null; }).then(render);
+  fetchSurge().then(s => { surge = s; surgeErr = null; }).catch(e => { surgeErr = e.message; }).then(render);
+  fetchStorms()
+    .then(list => {
+      storms = list; stormsErr = null;
+      render();
+      // Cones are fetched per storm and painted as they land; a slow zip must
+      // never hold up the storm list itself.
+      for(const st of list){
+        fetchCone(st)
+          .then(c => { coneCache[st.id] = c; })
+          .catch(() => { coneCache[st.id] = 'err'; })
+          .then(render);
+      }
+    })
+    .catch(e => { stormsErr = e.message; })
+    .then(render);
+  if(here) refreshZone();
+}
+
+async function boot(){
+  try{
+    preds = await fetchPreds();
+    predsErr = null;
+  }catch(e){
+    predsErr = e.message;
+    preds = [];
+  }
+  render();
+  loadAll();
+  if(!boot.timer){ boot.timer = setInterval(render, 60000); }   // the countdown has to tick
+  document.getElementById("buildLine").innerHTML =
+    "Storm Board build " + BUILD_NUM + " &middot; " + BUILD_STAMP +
+    " &middot; a companion to <a href=\"https://janfishes.github.io/tideboard/\">My Tides</a>," +
+    " which is where the lags and height models it uses are measured.";
+}
+
+if('serviceWorker' in navigator){
+  window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+}
+/* A new build always takes TWO opens with a stale-while-revalidate worker: the
+   first serves the saved copy and the refetch lands for the next. The pill
+   closes that gap on demand. Same design and same lesson as My Tides and WTF. */
+async function updateCheck(){
+  try{
+    const r = await fetch('index.html?ping=' + Date.now(), { cache:'no-store' });
+    if(!r.ok) return;
+    const m = /const BUILD_NUM = (\d+)/.exec(await r.text());
+    if(m && +m[1] > BUILD_NUM) showUpdatePill();
+  }catch(e){}
+}
+function showUpdatePill(){
+  if(document.getElementById('updatePill')) return;
+  const b = document.createElement('button');
+  b.id = 'updatePill'; b.className = 'updatepill'; b.textContent = 'New version — tap to update';
+  b.onclick = async () => {
+    if(b.dataset.busy) return;
+    b.dataset.busy = '1'; b.textContent = 'UPDATING…';
+    try{
+      const c = await caches.open('stormboard-shell-v1');
+      await Promise.race([ c.add(new Request('./index.html', {cache:'no-store'})),
+                           new Promise(r => setTimeout(r, 8000)) ]);
+    }catch(e){}
+    location.reload();
+  };
+  document.body.appendChild(b);
+}
+
+(function(){
+  loadPrefs();
+  boot();
+  updateCheck();
+  let lastCheck = Date.now();
+  window.addEventListener('focus', () => {
+    if(Date.now() - lastCheck > 600000){ lastCheck = Date.now(); updateCheck(); loadAll(); }
+  });
+})();
+</script>
+</body>
+</html>
