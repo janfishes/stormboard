@@ -178,7 +178,7 @@
    BUILD_NUM is what the update check compares, so it must go up on every
    deploy or a phone holding a cached copy will never learn there is a new one.
    ===================================================================== */
-const BUILD_NUM = 6;
+const BUILD_NUM = 7;
 const BUILD_STAMP = "2026-08-06";
 
 /* =====================================================================
@@ -1599,14 +1599,10 @@ function gaugesHTML(){
       nowhere to go. That is why the worst of it comes from rain and surge TOGETHER, and why a pond can
       overtop on a rainfall total it has handled before. Read the peak water time in the card above
       against the heaviest rain here: if they land together, that is the bad combination.</p>
-      <p class="note"><strong>And check whether yours is PUMPED.</strong> Several of the ponds here are,
-      and a pumped pond has a worse failure than a blocked outfall: it stops draining when the POWER
-      goes out, which in a hurricane is the same hours as the heaviest rain. If there is a pump, plan
-      on it being off. The owner &mdash; usually the city or the county &mdash; holds the control and
-      pump-start elevations, and in Florida the stormwater permit file is public: search the water
-      management district's permit portal by location and the engineering drawings in it give the weir
-      crest and the stage-storage. Beware the datum on old plans; drawings from the 2000s are often
-      NGVD29, about a foot off NAVD88.</p></div>`;
+      <p class="note"><strong>The pond card below has the numbers</strong> for the one structure near
+      here whose engineering is public &mdash; including the fact that it is PUMPED, which fails worse
+      than a blocked outfall because pumps stop when the POWER does, in the same hours as the heaviest
+      rain.</p></div>`;
   }
 
   /* ---- 4. Where they all are ---- */
@@ -1631,6 +1627,230 @@ function gaugesHTML(){
     the measured separation at Ponce. That conversion is applied ONLY to gauges in tidal water. Running
     it on a creek gauge above the tidal reach would turn a creek stage into a tide-looking number that
     means nothing.</p>
+    <p>PLANNING PURPOSES ONLY. DO NOT USE THIS APP FOR NAVIGATION.</p>
+  </div></details>`;
+  s += `</div></div>`;
+  return s;
+}
+
+/* =====================================================================
+   THE POND
+
+   The one stormwater structure near here whose engineering is public. Numbers
+   are read off the ICPR improved-condition model in the SJRWMD permit file, and
+   they are DESIGN values from the modelling, not as-builts.
+
+   WHY EVERYTHING BELOW IS A DIFFERENCE, NEVER AN ABSOLUTE. The plan's
+   elevations are in feet "MSL" (its own tailwater runs are "normal 2 ft MSL,
+   extreme 4.5 ft MSL"), which in 2005 Florida practice means NGVD29. This app's
+   water is MLLW. Those are two different datums and the offset between them is
+   NOT established here, so printing "the weir spills at X ft MLLW" beside the
+   tide would be exactly the class of error that once had this app reading 4.5 ft
+   low. Subtract two numbers on the same datum and the datum cancels: the 2.0 ft
+   from normal pool to the weir crest is true whatever the datum is. So the card
+   shows the ladder as spacings and never ties it to a tide height.
+
+   THE LIVE PART IS THE DRAINAGE WINDOW. A pond on a gravity outfall empties
+   when the water it drains INTO is low. The 2004 flood that caused this whole
+   project was not a record high tide; the file describes "a standing tidal stage
+   of approximately 4.5 feet above mean sea level... which did not allow a low
+   tide cycle for almost a 24 hour period". No low tide means no drainage window,
+   and the rain kept coming. So the number worth watching is how long the
+   receiving water goes without falling to its normal low, which is a comparison
+   of two heights on the SAME datum and therefore safe to compute.
+   ===================================================================== */
+const POND = {
+  what:  "The pond east of Trailwood Drive",
+  where: "SJRWMD permit 100485, City of Port Orange",
+  acres: 12.2,
+  normalPool: 2.00, pumpOn: 3.10, pumpOff: 3.00, weirCrest: 4.00,
+  peak25: 5.75, peak100: 6.1, warn: 7.00,
+  pumps: 3, pumpCfs: 100,
+  /* Crooked Creek into Rose Bay — where the outfall discharges. */
+  recv: { lat: 29.0955, lng: -80.9550 }
+};
+
+/* Whole spans that overlap the window, matching rainAhead's convention: a QPF
+   span is 2-6 h and splitting one pro-rata would invent precision. */
+function rainBetween(t0, t1){
+  if(!wx || !wx.qpf || !wx.qpf.length) return null;
+  let sum = 0, any = false;
+  for(const s of wx.qpf){
+    if(s.t1 <= t0 || s.t0 >= t1) continue;
+    sum += s.v; any = true;
+  }
+  return any ? sum : null;
+}
+
+function pondOutlook(){
+  if(!surge || !preds.length) return null;
+  let loc = null, best = Infinity;
+  for(const l of LOCATIONS){
+    const d = distNm(l, POND.recv);
+    if(d < best){ best = d; loc = l; }
+  }
+  if(!loc) return null;
+  const events = shifted(loc.key);
+  const t0 = Math.max(Date.now(), surge.t[0].getTime());
+  const t1 = surge.t[surge.t.length-1].getTime();
+  if(t1 <= t0) return null;
+
+  /* The reference level: the HIGHEST of this spot's astronomical lows in the
+     window. It is the level the water reaches on EVERY cycle in normal weather
+     — every other low goes deeper — so it pins the fair-weather baseline at one
+     tidal cycle and makes the storm's effect readable as the difference. */
+  const lows = events.filter(e => e.type === "L" && e.time.getTime() >= t0 - 6*3600000
+                                                 && e.time.getTime() <= t1)
+                     .map(e => e.ft).sort((a,b) => a-b);
+  if(!lows.length) return null;
+  const lowLine = lows[lows.length - 1];
+
+  /* WHY THIS EVALUATES THE LOW EVENTS AND NEVER SAMPLES THE CURVE. The obvious
+     way is to walk the curve on a grid and look for points below the line. It
+     is wrong here, and quietly so. The tide is nearly flat around a low and the
+     line IS one of the lows, so no grid point ever lands exactly on that
+     cycle's bottom — every sample beside it reads a hair ABOVE the line, the
+     cycle is missed, two days merge into one, and the fair-weather baseline
+     comes out at 21-25 h when the true answer is 12.6. Both a crossing test and
+     a local-minimum test on the grid fail this way, for the same reason.
+
+     The lows are already known EXACTLY: they are prediction events with their
+     own times and heights. So evaluate those. Astronomically every low is at or
+     below the highest low by definition, so all of them count and the baseline
+     lands on one tidal cycle with nothing to tune. Surge varies slowly next to
+     the flat bottom of a low, so the total at the low's own time is the depth
+     that cycle reaches. Exact input beats a tolerance on a sampled one. */
+  const drainTimes = (useSurge) => {
+    const opps = [];
+    for(const e of events){
+      if(e.type !== "L") continue;
+      const ms = e.time.getTime();
+      if(ms < t0 || ms > t1) continue;
+      let v = e.ft;
+      if(useSurge){
+        const r = totalAt(loc, events, e.time);
+        if(!r || r.total == null) continue;   // past the surge horizon: unknown, not "drains"
+        v = r.total;
+      }
+      if(v <= lowLine + 1e-9) opps.push(ms);
+    }
+    return opps;
+  };
+  /* Longest wait for a drainage opportunity: the gaps between them, plus the
+     wait from now to the first. The tail after the last one is NOT counted —
+     that is just the forecast running out, and counting it would report the
+     horizon as if it were a blocked outfall. */
+  const longestWait = (opps) => {
+    let bestMs = 0, bs = null, be = null;
+    const marks = [t0].concat(opps);
+    for(let i = 0; i < marks.length - 1; i++){
+      const d = marks[i+1] - marks[i];
+      if(d > bestMs){ bestMs = d; bs = marks[i]; be = marks[i+1]; }
+    }
+    /* No drainage at all inside the forecast: the wait is the whole window and
+       is still running when the forecast ends, so it is a floor, not a total. */
+    if(!opps.length) return { hours:(t1-t0)/3600000, start:t0, end:t1, count:0, atLeast:true };
+    return { hours: bestMs/3600000, start: bs, end: be, count: opps.length, atLeast:false };
+  };
+  const shut = longestWait(drainTimes(true)), normal = longestWait(drainTimes(false));
+  const rain = (shut.start != null) ? rainBetween(shut.start, shut.end) : null;
+  return { loc, nm: best, lowLine, shut, normal, rain, horizon: new Date(t1) };
+}
+
+function pondHTML(){
+  const o = pondOutlook();
+  /* 18 h is the threshold because a normal day here gives roughly twelve — two
+     lows a day. Past about eighteen the pond has missed a cycle it would
+     ordinarily have drained on. Frances ran to nearly twenty-four. */
+  const bad = o && o.shut.hours >= 18 && o.rain != null && o.rain >= 1.0;
+  const watch = o && o.shut.hours >= 18;
+  const badge = bad   ? `<div class="badge sever">rain with no drainage</div>`
+              : watch ? `<div class="badge warn">drainage window closing</div>`
+              :         `<div class="badge water">structure only</div>`;
+  let s = `<div class="card ${bad ? "alarm" : watch ? "rising" : ""}" id="pond"><div class="card-head">
+    <div class="card-title">The pond<span class="sub">stormwater &middot; drainage window</span></div>
+    ${badge}</div><div class="body">`;
+
+  s += `<p><strong>${esc(POND.what)}</strong> &mdash; ${POND.acres} acres, ${POND.pumps} pumps of
+        ${POND.pumpCfs} cfs and a ${POND.weirCrest - POND.normalPool} ft wall of freeboard between
+        its normal pool and the weir it spills over. Nothing measures it. These are DESIGN figures
+        from the engineering model in ${esc(POND.where)}, not as-builts.</p>`;
+
+  s += `<div class="wrapx"><table class="grid"><thead><tr>
+    <th>Level</th><th class="num">Above normal pool</th><th>What happens</th>
+    </tr></thead><tbody>`;
+  const rung = (label, ft, why, cls) =>
+    `<tr${cls ? ` class="${cls}"` : ""}><td>${label}</td><td class="num">${
+      ft === POND.normalPool ? "&mdash;" : "+" + (ft - POND.normalPool).toFixed(2) + " ft"
+    }</td><td>${why}</td></tr>`;
+  s += rung("Normal pool", POND.normalPool, "Where it sits between storms");
+  s += rung("Pumps start", POND.pumpOn, `${POND.pumps} &times; ${POND.pumpCfs} cfs, staged. <strong>City-operated &mdash; and they need power</strong>`);
+  s += rung("Weir crest", POND.weirCrest, "It starts spilling to Crooked Creek. This is normal, it is the outlet", "near");
+  s += rung("25-year design peak", POND.peak25, "Over the weir by " + (POND.peak25 - POND.weirCrest).toFixed(2) + " ft");
+  s += rung("100-year design peak", POND.peak100, "Over the weir by about " + (POND.peak100 - POND.weirCrest).toFixed(1) + " ft", "over");
+  s += `</tbody></table></div>`;
+
+  s += `<div class="rule"></div><div class="grouphd">The drainage window</div>`;
+  if(!o){
+    s += `<p class="note">Needs the tide and the surge forecast; one of them has not loaded.</p>`;
+  } else {
+    const hrs = o.shut.hours;
+    s += `<p>A pond on a gravity outfall only empties while the water it drains into is low.
+      Measured at <strong>${esc(o.loc.name)}</strong>, the nearest modelled spot to Crooked Creek
+      and Rose Bay:</p>`;
+    s += `<p class="big">${o.shut.atLeast ? "over " : ""}${hrs.toFixed(0)} hours
+      <span class="unit">without a low tide</span></p>`;
+    if(o.shut.start != null)
+      s += `<p class="note">Longest wait for a low tide that gets down to its normal level, from
+        ${esc(fmtDT(new Date(o.shut.start)))} to ${esc(fmtDT(new Date(o.shut.end)))}${
+        o.shut.atLeast ? " &mdash; and it has not come by the end of the forecast" : ""}. On the
+        astronomical tide alone the longest wait is ${o.normal.hours.toFixed(0)} h, one tidal cycle${
+        (hrs - o.normal.hours) < 1
+          ? ", so nothing is being taken away right now"
+          : `, so the storm is taking <strong>${(hrs - o.normal.hours).toFixed(0)} h</strong> of drainage away`
+        }.</p>`;
+    if(o.rain != null)
+      s += `<p><strong>${o.rain.toFixed(1)} in of rain</strong> is forecast inside that stretch.</p>`;
+    else
+      s += `<p class="note">No rain forecast inside that stretch.</p>`;
+
+    if(bad)
+      s += `<div class="warnblock"><div class="hd">The bad combination</div>
+        Rain is falling during the hours the pond cannot drain. This is what took out 200 homes in
+        this basin in 2004: not a record tide, but a standing one that never let a low through for
+        nearly a day, on ground already soaked.</div>`;
+    else if(watch)
+      s += `<p class="note"><strong>The window is closing but little rain is forecast in it.</strong>
+        A pond can sit through a long high with no rain. It is the two together that overtop it.</p>`;
+    else
+      s += `<p class="note">Normal tidal drainage &mdash; the water is getting down to its low and
+        the outfall is working.</p>`;
+    s += `<p class="note">Surge forecast runs to ${esc(fmtDT(o.horizon))}; nothing beyond that is
+      counted, so a long window may still be building at the end of it.</p>`;
+  }
+
+  s += `<details class="help"><summary>What these numbers are, and are not</summary><div>
+    <p><strong>Every elevation here is shown as a DIFFERENCE, on purpose.</strong> The plan's
+    figures are in feet "MSL" &mdash; its own runs use a Rose Bay tailwater of "normal 2 ft MSL,
+    extreme 4.5 ft MSL" &mdash; which in 2005 Florida practice means NGVD29. This app's water is
+    MLLW. Those are different datums, and the offset between them is not established here. Two
+    heights on the same datum can be subtracted safely and the datum cancels; a single one cannot
+    be compared with a tide. So the ladder above is spacings, and no line on it is tied to a tide
+    height. That restraint is deliberate: getting a datum sign backwards is exactly what once made
+    this app read every measured water level 4.5 ft low.</p>
+    <p><strong>These are design values, not as-builts.</strong> They come from the improved-condition
+    hydraulic model in the permit file. The application that contains them is for the SOUTH area of
+    the basin; this pond is in the CENTRAL area, which the same document says "will be submitted for
+    permitting under a separate application". A later sequence of the permit should hold what was
+    actually built.</p>
+    <p><strong>The pumps are not yours and they need power.</strong> The file is explicit: a
+    permanent pumping station "to allow the pond to be pumped down before and during impending
+    extreme storms", and "the Port Orange Public Works Department will have the only access to
+    control of the pumping station during emergencies". In a hurricane, plan on them being off &mdash;
+    the hours the power fails are the same hours the rain is heaviest.</p>
+    <p><strong>Nothing measures this pond.</strong> There is no gauge in it, no telemetry and no
+    public feed. The drainage window above is computed from the tide and surge forecast for the
+    water it drains into; it is not a reading of the pond.</p>
     <p>PLANNING PURPOSES ONLY. DO NOT USE THIS APP FOR NAVIGATION.</p>
   </div></details>`;
   s += `</div></div>`;
@@ -1776,7 +1996,7 @@ let predsErr = null;
 function render(){
   const el = document.getElementById("content");
   if(!el) return;
-  el.innerHTML = alertsHTML() + clockHTML() + waterHTML() + gaugesHTML() + tropicsHTML() + zoneHTML() + checklistHTML();
+  el.innerHTML = alertsHTML() + clockHTML() + waterHTML() + gaugesHTML() + pondHTML() + tropicsHTML() + zoneHTML() + checklistHTML();
   const t = threatOf();
   document.getElementById("subLine").innerHTML =
     `Ponce de Leon Inlet &amp; the Halifax River &middot; <span class="badge ${t}">${
