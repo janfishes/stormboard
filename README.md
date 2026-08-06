@@ -100,6 +100,62 @@ entirely plausible. `outSR=4326` is load bearing.
 
 ---
 
+## Measured water: the gauges, and why there are almost none
+
+Checked site by site on 2026-08-06. **There is no permanent water level gauge in
+Port Orange or New Smyrna Beach.**
+
+| Gauge | Status |
+|---|---|
+| Turnbull Creek nr NSB (02248060) — **40 m from the Turnbull Bay trestle** | recorded 2000–**2009**, switched off |
+| Spruce Creek nr NSB (02248053) | ended **2006** |
+| Reed Canal, Halifax Canal nr Harbor Oaks | both ended **Sept 2013** |
+| "Halifax River at Port Orange" (290855080582700), at the Dunlawton bridge | **six readings, 5–11 Oct 2016** — a Hurricane Matthew deployment |
+| **Spruce Creek nr Samsula (02248000)** | **live**, real-time, record back to 1951 |
+
+The **Spruce Creek Park tide gauge is not a live feed.** It was a Stevens survey
+gauge, and its 59 samples are already spent: they *are* the +213/+247 lag and the
+0.645 height scaling that WTF and My Tides use for that spot.
+
+### The card lights itself up
+
+USGS pre-surveys sites and deploys gauges ahead of a landfalling hurricane. The
+catalogue already includes Turnbull Creek ("power pole SE side of bridge, between
+bridge and RR bridge"), Rose Bay Bridge, the SR421/Dunlawton bridge and the Port
+Orange pier. Matthew 2016 put a live one at Port Orange, Ian 2022 at Daytona
+Main St, Milton 2024 none here.
+
+One bbox call returns every site in the box **including the discontinued and
+not-yet-deployed ones, with empty value arrays**. So "is it reporting" is just
+"does it have values", and a storm deployment appears on its own with no code
+change and no list to maintain.
+
+Where a deployed gauge lands within 0.3 nm of one of your spots — the Dunlawton
+bridge gauge is 116 m from the Dunlawton card — the app computes **measured minus
+predicted astronomical = the surge that actually happened**, and prints it beside
+what P-ETSS forecast. That check has never been possible on this water. Matched
+by **position, never by name**.
+
+### Two datum rules
+
+`62620` (estuary/ocean water surface elevation) and `63160` are **NAVD88**;
+everything else here is MLLW, so tidal readings get −2.25 ft on the way in. That
+conversion is applied **only to tidal sites**. Spruce Creek near Samsula is 8 km
+upstream, above the tidal reach — converting it would turn a creek stage into a
+tide-looking number that means nothing. It is a **runoff** signal, and because it
+sits *upstream* of Spruce Creek Park it sees fresh water before the park does.
+
+### Rainfall, and stormwater structures
+
+The card also carries NWS `quantitativePrecipitation`, because a stormwater pond,
+berm or dam is driven by **rain**, with no surge term in it at all. **Nothing
+public monitors those structures in real time** — they are below the National
+Inventory of Dams thresholds (NID lists only two dams in all of Volusia County,
+both 15+ nm inland) and absent from OpenStreetMap. The rain forecast and the
+creek gauge are the closest available warning.
+
+---
+
 ## Shared state
 
 Storm Board is served from `janfishes.github.io`, the same origin as My Tides

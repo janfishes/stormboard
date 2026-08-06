@@ -178,7 +178,7 @@
    BUILD_NUM is what the update check compares, so it must go up on every
    deploy or a phone holding a cached copy will never learn there is a new one.
    ===================================================================== */
-const BUILD_NUM = 1;
+const BUILD_NUM = 2;
 const BUILD_STAMP = "2026-08-06";
 
 /* =====================================================================
@@ -234,6 +234,63 @@ const VC_LAYER = { sandbags:1, shelters:2, routes:3, surgezone:4, evaczone:5 };
    LESSON: verify CORS in a BROWSER, not with curl. curl does not enforce it and
    therefore cannot see it being absent. */
 const NHC_GIS = "https://www.nhc.noaa.gov/gis/forecast/archive/";
+
+/* =====================================================================
+   USGS GAUGES — the only water round here that is actually MEASURED
+
+   There is no permanent water level gauge in Port Orange or New Smyrna Beach.
+   Checked site by site, 2026-08-06:
+     - Turnbull Creek nr NSB (02248060), 40 m from the Turnbull Bay trestle:
+       recorded 2000-2009, then shut off.
+     - Spruce Creek nr NSB (02248053): ended 2006.
+     - Reed Canal, Halifax Canal nr Harbor Oaks: both ended Sept 2013.
+     - "Halifax River at Port Orange" (290855080582700) at the Dunlawton bridge
+       is NOT permanent — its entire record is six readings, 5-11 Oct 2016,
+       Hurricane Matthew.
+
+   But that last one is the interesting part. USGS pre-surveys sites and DEPLOYS
+   gauges ahead of a landfalling hurricane, and their catalogue already includes
+   Turnbull Creek ("power pole SE side of bridge, between bridge and RR
+   bridge"), Rose Bay Bridge, the SR421/Dunlawton bridge and the Port Orange
+   fishing pier. Matthew 2016 put a live one at Port Orange; Ian 2022 put one at
+   Daytona Main St. Milton 2024 got none here.
+
+   So this card is quiet most of the year and becomes the most valuable thing on
+   the page during a storm — the first and only MEASURED water level near this
+   dock, against a forecast that otherwise cannot be checked at all.
+
+   ONE CALL DOES IT. The bbox query returns the discontinued and not-yet-
+   deployed sites too, with EMPTY value arrays. So "is it reporting" is just
+   "does it have values", and a gauge switched on for a hurricane starts
+   appearing on its own with no code change and no list to maintain.
+
+   api.waterservices.usgs.gov sends access-control-allow-origin: * — verified in
+   a browser this time, not with curl — so it needs no proxy.
+   ===================================================================== */
+const USGS_BBOX  = "-81.10,28.95,-80.85,29.30";       // Halifax / Ponce / NSB
+const USGS_PARMS = "00065,62620,63160,00060";
+/* 62620 is the one that matters: "estuary or ocean water surface elevation".
+   A site reporting it is in TIDAL water and its reading can be compared with
+   this app's forecast. 00065/63160 are creek stage, which cannot. */
+const P_ESTUARY = "62620", P_STAGE = "00065", P_NAVD = "63160", P_FLOW = "00060";
+
+/* NAVD88 stands 2.25 ft above MLLW at Ponce (station 8721138 datums: MLLW 2.94,
+   NAVD88 5.19). USGS publishes 62620 and 63160 on NAVD88; everything on this
+   page is MLLW, so tidal readings are converted on the way in.
+
+   THE CONVERSION APPLIES ONLY TO TIDAL SITES. Running it on Spruce Creek near
+   Samsula — 8 km upstream, above the tidal reach — would produce a tide-like
+   number for water that is not tidal at all. That gauge is a RUNOFF signal and
+   is deliberately left on its own datum and never compared to a forecast. */
+const NAVD88_ABOVE_MLLW = 2.25;
+
+/* How close a gauge has to be to one of your spots before its reading is used
+   to work out an observed surge. Matched by POSITION, never by name — the
+   USGS's vocabulary and yours are different, and a name match would silently
+   attach a reading to the wrong water. Same rule Mini Mapper uses to push a
+   sounding back to the tide board. The Dunlawton bridge gauge sits 116 m from
+   the Dunlawton card, which is what this threshold is sized for. */
+const GAUGE_MATCH_NM = 0.3;
 
 /* Wind thresholds, in mph, from the NWS definitions. These are the numbers the
    countdown is built on and they are not tunable — a "tropical storm force
@@ -338,6 +395,10 @@ function esc(s){ return String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt
 const fmtT = d => d.toLocaleTimeString([], {hour:"numeric", minute:"2-digit"});
 const fmtDT = d => d.toLocaleDateString([], {weekday:"short", month:"numeric", day:"numeric"}) + " " + fmtT(d);
 const titleCase = s => String(s).toLowerCase().replace(/\b[a-z]/g, c => c.toUpperCase());
+/* USGS site names are SHOUTED and end in the state: "SPRUCE CREEK NEAR SAMSULA,
+   FL". titleCase alone turns the state into "Fl", so the suffix is dropped
+   before casing rather than special-cased afterwards. */
+const gaugeName = s => titleCase(String(s).replace(/,?\s*FL\.?\s*$/i, ""));
 
 function fetchT(url, ms, opts){
   const ctl = new AbortController();
@@ -584,12 +645,30 @@ async function fetchWx(){
   const r = await fetchT(NWS_GRID, 12000, { headers:{ "Accept":"application/geo+json" } });
   if(!r.ok) throw new Error("NWS " + r.status);
   const p = (await r.json()).properties;
-  const KMH_TO_MPH = 0.621371;
+  const KMH_TO_MPH = 0.621371, MM_TO_IN = 1/25.4;
   return {
     wind: nwsSpans(p.windSpeed, v => v*KMH_TO_MPH),
     gust: nwsSpans(p.windGust, v => v*KMH_TO_MPH),
+    /* Rainfall, in inches. Carried because in a wet tropical system the water
+       that puts this area under is very often the rain running off the land,
+       not the surge coming up the river — and a stormwater pond or berm is
+       driven entirely by rainfall, with no surge term in it at all. */
+    qpf:  nwsSpans(p.quantitativePrecipitation, v => v*MM_TO_IN),
     updated: p.updateTime ? new Date(p.updateTime) : null
   };
+}
+/* Forecast rain total between now and `hours` ahead. Spans are summed whole
+   when they start inside the window — QPF spans are 2-6 h and splitting one
+   pro-rata would invent a precision the forecast does not have. */
+function rainAhead(hours){
+  if(!wx || !wx.qpf || !wx.qpf.length) return null;
+  const now = Date.now(), end = now + hours*3600000;
+  let t = 0, any = false;
+  for(const s of wx.qpf){
+    if(s.t1.getTime() < now || s.t0.getTime() > end) continue;
+    t += s.v; any = true;
+  }
+  return any ? t : null;
 }
 async function fetchAlerts(){
   const r = await fetchT("https://api.weather.gov/alerts/active?zone=" + NWS_ZONES, 10000);
@@ -825,6 +904,59 @@ function inPolygon(pt, ring){
        (pt[0] < (xj - xi)*(pt[1] - yi)/(yj - yi) + xi)) inside = !inside;
   }
   return inside;
+}
+
+/* =====================================================================
+   USGS — fetch and classify
+
+   One bbox call returns every site in the box, including the discontinued and
+   the not-yet-deployed ones, which come back with EMPTY value arrays. So a
+   gauge is "reporting" if and only if it has values, and a storm deployment
+   appears on its own the moment USGS switches it on.
+   ===================================================================== */
+let gauges = null, gaugesErr = null;
+
+async function fetchUsgs(){
+  const url = "https://waterservices.usgs.gov/nwis/iv/?format=json&bBox=" + USGS_BBOX
+            + "&parameterCd=" + USGS_PARMS + "&period=PT30H";
+  const r = await fetchT(url, 15000);
+  if(!r.ok) throw new Error("USGS " + r.status);
+  const series = (((await r.json()).value) || {}).timeSeries || [];
+  const byId = {};
+  for(const ts of series){
+    const raw = ((ts.values || [])[0] || {}).value || [];
+    // -999999 is USGS's no-data marker and would otherwise plot as a canyon.
+    const vals = raw.filter(v => v.value != null && v.value !== "" && parseFloat(v.value) > -999998);
+    if(!vals.length) continue;                       // catalogued but not reporting
+    const si = ts.sourceInfo, gl = si.geoLocation.geogLocation;
+    const code = si.siteCode[0].value;
+    const g = byId[code] || (byId[code] = {
+      code, name: si.siteName, lat: gl.latitude, lng: gl.longitude, parms: {}
+    });
+    const first = vals[0], last = vals[vals.length - 1];
+    g.parms[ts.variable.variableCode[0].value] = {
+      v: parseFloat(last.value), t: new Date(last.dateTime),
+      v0: parseFloat(first.value), t0: new Date(first.dateTime)
+    };
+  }
+  const list = Object.values(byId);
+  for(const g of list){
+    // A site reporting 62620 is in TIDAL water; its reading can be compared
+    // with this app's forecast. Creek stage cannot.
+    g.tidal = !!g.parms[P_ESTUARY];
+    g.nm = distNm(INLET, { lat:g.lat, lng:g.lng });
+    if(g.tidal){
+      g.mllw = g.parms[P_ESTUARY].v - NAVD88_ABOVE_MLLW;
+      // Match to one of your spots BY POSITION, never by name.
+      let best = null;
+      for(const loc of LOCATIONS){
+        const d = distNm({lat:g.lat, lng:g.lng}, {lat:loc.lat, lng:loc.lng});
+        if(d <= GAUGE_MATCH_NM && (!best || d < best.d)) best = { loc, d };
+      }
+      g.match = best;
+    }
+  }
+  return list;
 }
 
 /* =====================================================================
@@ -1196,6 +1328,126 @@ function waterHTML(){
   return s;
 }
 
+/* ---- Measured water, runoff and rain ---- */
+function gaugesHTML(){
+  const tidal = (gauges || []).filter(g => g.tidal);
+  const creek = (gauges || []).filter(g => !g.tidal);
+  const badge = tidal.length ? `<div class="badge sever">${tidal.length} measuring</div>`
+                             : `<div class="badge water">runoff only</div>`;
+  let s = `<div class="card ${tidal.length ? "rising" : ""}" id="gauges"><div class="card-head">
+    <div class="card-title">Measured water<span class="sub">USGS gauges &middot; rain to come</span></div>
+    ${badge}</div><div class="body">`;
+
+  if(gaugesErr){
+    s += `<p>Couldn't reach USGS (${esc(gaugesErr)}).</p></div></div>`;
+    return s;
+  }
+  if(!gauges){ s += `<p class="note">Reading the gauges&hellip;</p></div></div>`; return s; }
+
+  /* ---- 1. Storm-deployed tidal gauges: the headline when they exist ---- */
+  if(tidal.length){
+    s += `<p><strong>A gauge is in the water and reporting.</strong> This is the only
+          MEASURED water level near here &mdash; everything else on this page is forecast.</p>`;
+    s += `<div class="wrapx"><table class="grid"><thead><tr>
+      <th>Gauge</th><th class="num">Water now</th><th class="num">6 h ago</th><th>Reading</th>
+      </tr></thead><tbody>`;
+    for(const g of tidal){
+      const p = g.parms[P_ESTUARY];
+      const rise = p.v - p.v0;
+      s += `<tr><td>${esc(gaugeName(g.name))}<br><span class="note">${g.nm.toFixed(1)} nm from the inlet</span></td>
+        <td class="num"><strong>${g.mllw.toFixed(1)} ft</strong><br><span class="note">MLLW</span></td>
+        <td class="num">${(rise >= 0 ? "+" : "") + rise.toFixed(1)} ft<br><span class="note">since ${esc(fmtT(p.t0))}</span></td>
+        <td><span class="note">${esc(fmtT(p.t))}</span></td></tr>`;
+      /* The comparison that has never been possible here: measured minus
+         predicted astronomical = the surge that ACTUALLY happened, against the
+         surge P-ETSS said would. Only offered where the gauge sits on top of
+         one of your spots, so the astronomical side is a model that has been
+         calibrated for that exact water. */
+      if(g.match && preds.length){
+        const loc = g.match.loc;
+        const astro = tideAt(shifted(loc.key), p.t);
+        if(astro != null){
+          const obsAnom = g.mllw - astro;
+          const o = offsets[loc.key] || { hi:0, lo:0 };
+          const fc = surgeAt(new Date(p.t.getTime() - ((o.hi + o.lo)/2)*60000));
+          s += `<tr><td colspan="4" class="note">&nbsp;&nbsp;This gauge is
+            ${(g.match.d*2025.37).toFixed(0)} yd from <strong>${esc(loc.name)}</strong>.
+            Predicted tide there ${astro.toFixed(1)} ft, so the surge actually running is
+            <strong>${(obsAnom >= 0 ? "+" : "") + obsAnom.toFixed(1)} ft</strong>` +
+            (fc == null ? `. The surge forecast does not cover this hour.`
+                        : ` against a forecast of ${(fc >= 0 ? "+" : "") + fc.toFixed(1)} ft.`) +
+            `</td></tr>`;
+        }
+      }
+    }
+    s += `</tbody></table></div>`;
+  }else{
+    s += `<p>No gauge is measuring water level in the Halifax right now, and normally none is.
+          <strong>There is no permanent tide gauge in Port Orange or New Smyrna Beach</strong> &mdash;
+          the ones that existed were switched off years ago.</p>
+          <p class="note">USGS deploys temporary gauges ahead of a landfalling hurricane, and their
+          survey list already includes Turnbull Creek (the power pole between the road bridge and the
+          trestle), Rose Bay Bridge, the Dunlawton bridge and the Port Orange pier. Matthew put one at
+          Port Orange in 2016 and Ian put one at Daytona in 2022. If one goes in for the next storm it
+          appears here on its own.</p>`;
+  }
+
+  /* ---- 2. Runoff ---- */
+  if(creek.length){
+    s += `<div class="rule"><p class="note"><strong>Fresh water coming down</strong></p>`;
+    s += `<div class="wrapx"><table class="grid"><thead><tr>
+      <th>Gauge</th><th class="num">Stage</th><th class="num">24 h change</th><th class="num">Flow</th>
+      </tr></thead><tbody>`;
+    for(const g of creek){
+      const st = g.parms[P_STAGE] || g.parms[P_NAVD];
+      const fl = g.parms[P_FLOW];
+      if(!st) continue;
+      const d = st.v - st.v0;
+      const word = Math.abs(d) < 0.05 ? "steady" : (d > 0 ? "RISING" : "falling");
+      s += `<tr><td>${esc(gaugeName(g.name))}</td>
+        <td class="num">${st.v.toFixed(2)} ft</td>
+        <td class="num">${(d >= 0 ? "+" : "") + d.toFixed(2)} ft<br><span class="note">${esc(word)}</span></td>
+        <td class="num">${fl ? Math.round(fl.v) + " cfs" : "&mdash;"}</td></tr>`;
+    }
+    s += `</tbody></table></div>`;
+    s += `<p class="note">Spruce Creek at Samsula is the only gauge still running in this basin, and it
+          sits <strong>upstream</strong> of Spruce Creek Park &mdash; so it sees the fresh water before
+          the park does. Rising here means runoff on its way down. It is on its own datum and is NOT a
+          tide: do not compare it with the MLLW numbers above.</p></div>`;
+  }
+
+  /* ---- 3. Rain ---- */
+  const r24 = rainAhead(24), r72 = rainAhead(72);
+  if(r24 != null || r72 != null){
+    s += `<div class="rule"><p class="note"><strong>Rain forecast</strong></p>
+      <p>${r24 != null ? `<strong>${r24.toFixed(1)} in</strong> in the next 24 hours` : ""}
+         ${r24 != null && r72 != null ? " &middot; " : ""}
+         ${r72 != null ? `<strong>${r72.toFixed(1)} in</strong> over 72 hours` : ""}.</p>
+      <p class="note">A stormwater pond, berm or dam is driven by RAIN, not by surge &mdash; there is no
+      tide term in it at all. Nothing public monitors those structures in real time, so this forecast
+      and the creek above are the closest warning available.</p></div>`;
+  }
+
+  s += `<details class="help"><summary>Where these gauges are, and why there are so few</summary><div class="body2">
+    <p><strong>Nothing permanent measures the tide in Port Orange or New Smyrna Beach.</strong> Checked
+    site by site: Turnbull Creek near NSB, 40 m from the Turnbull Bay trestle, recorded 2000&ndash;2009
+    and was shut off. Spruce Creek near NSB ended in 2006. Reed Canal and Halifax Canal near Harbor Oaks
+    both ended in September 2013. "Halifax River at Port Orange", at the Dunlawton bridge, has a total
+    record of six readings on 5&ndash;11 October 2016 &mdash; it was a Hurricane Matthew deployment.</p>
+    <p><strong>The Spruce Creek Park tide gauge is not a live feed.</strong> It was a Stevens survey
+    gauge, and its 59 samples are already spent: they are the +213/+247 lag and the 0.645 height scaling
+    that WTF and My Tides use for that spot. You are reading it every time you open those apps &mdash;
+    just as a calibration, not as a reading.</p>
+    <p><strong>Tidal readings are converted from NAVD88 to MLLW</strong> by subtracting 2.25 ft, which is
+    the measured separation at Ponce. That conversion is applied ONLY to gauges in tidal water. Running
+    it on a creek gauge above the tidal reach would turn a creek stage into a tide-looking number that
+    means nothing.</p>
+    <p>PLANNING PURPOSES ONLY. DO NOT USE THIS APP FOR NAVIGATION.</p>
+  </div></details>`;
+  s += `</div></div>`;
+  return s;
+}
+
 /* ---- The clock ---- */
 function clockHTML(){
   const ts = firstAbove(TS_FORCE_MPH);
@@ -1335,7 +1587,7 @@ let predsErr = null;
 function render(){
   const el = document.getElementById("content");
   if(!el) return;
-  el.innerHTML = alertsHTML() + clockHTML() + waterHTML() + tropicsHTML() + zoneHTML() + checklistHTML();
+  el.innerHTML = alertsHTML() + clockHTML() + waterHTML() + gaugesHTML() + tropicsHTML() + zoneHTML() + checklistHTML();
   const t = threatOf();
   document.getElementById("subLine").innerHTML =
     `Ponce de Leon Inlet &amp; the Halifax River &middot; <span class="badge ${t}">${
@@ -1453,6 +1705,7 @@ function loadAll(){
   fetchWx().then(w => { wx = w; wxErr = null; }).catch(e => { wxErr = e.message; }).then(render);
   fetchAlerts().then(a => { alerts = a; }).catch(() => { alerts = null; }).then(render);
   fetchSurge().then(s => { surge = s; surgeErr = null; }).catch(e => { surgeErr = e.message; }).then(render);
+  fetchUsgs().then(g => { gauges = g; gaugesErr = null; }).catch(e => { gaugesErr = e.message; }).then(render);
   fetchStorms()
     .then(list => {
       storms = list; stormsErr = null;
