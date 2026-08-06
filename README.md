@@ -154,6 +154,13 @@ Inventory of Dams thresholds (NID lists only two dams in all of Volusia County,
 both 15+ nm inland) and absent from OpenStreetMap. The rain forecast and the
 creek gauge are the closest available warning.
 
+**Rain is only half of why one overtops.** These ponds drain east to the Halifax
+by gravity through an outfall at their own low level. When surge lifts the
+receiving water the outfall stops draining and can run backwards, so the pond
+keeps filling from the sky with nowhere to go — compound flooding. That is why a
+pond can overtop on a rainfall total it has handled before, and why the card
+tells you to read peak water time against heaviest rain.
+
 ---
 
 ## Shared state

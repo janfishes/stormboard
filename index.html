@@ -178,7 +178,7 @@
    BUILD_NUM is what the update check compares, so it must go up on every
    deploy or a phone holding a cached copy will never learn there is a new one.
    ===================================================================== */
-const BUILD_NUM = 2;
+const BUILD_NUM = 3;
 const BUILD_STAMP = "2026-08-06";
 
 /* =====================================================================
@@ -1423,9 +1423,16 @@ function gaugesHTML(){
       <p>${r24 != null ? `<strong>${r24.toFixed(1)} in</strong> in the next 24 hours` : ""}
          ${r24 != null && r72 != null ? " &middot; " : ""}
          ${r72 != null ? `<strong>${r72.toFixed(1)} in</strong> over 72 hours` : ""}.</p>
-      <p class="note">A stormwater pond, berm or dam is driven by RAIN, not by surge &mdash; there is no
-      tide term in it at all. Nothing public monitors those structures in real time, so this forecast
-      and the creek above are the closest warning available.</p></div>`;
+      <p class="note">A stormwater pond, berm or dam fills with RAIN, and nothing public monitors those
+      structures in real time &mdash; so this forecast and the creek above are the closest warning
+      available.</p>
+      <p class="note"><strong>But rain is only half of why one overtops.</strong> These ponds drain east
+      to the Halifax by gravity, through an outfall at their own low level. When the surge lifts the
+      receiving water, that outfall stops draining and can run backwards &mdash; so the pond keeps
+      filling from the sky with nowhere to go. That is why the worst of it comes from rain and surge
+      TOGETHER, and why a pond can overtop on a rainfall total it has handled before. Read the peak
+      water time in the card above against the heaviest rain here: if they land together, that is the
+      bad combination.</p></div>`;
   }
 
   s += `<details class="help"><summary>Where these gauges are, and why there are so few</summary><div class="body2">
