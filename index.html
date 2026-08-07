@@ -178,7 +178,7 @@
    BUILD_NUM is what the update check compares, so it must go up on every
    deploy or a phone holding a cached copy will never learn there is a new one.
    ===================================================================== */
-const BUILD_NUM = 12;
+const BUILD_NUM = 13;
 const BUILD_STAMP = "2026-08-06";
 
 /* =====================================================================
@@ -373,6 +373,22 @@ const BUILTIN_LOCATIONS = [
     lat:29.080050, lng:-80.983283, hi:105, lo:120, est:true },
   { key:"tbtrestle", name:"Turnbull Bay Trestle",    charted:"FEC railroad, Turnbull Bay",
     lat:29.050700, lng:-80.959650, hi:110, lo:130, est:true },
+  /* SPRUCE CREEK PARK — the spot the pond's water actually reaches.
+     Not an estimate. It is a Stevens survey station in WTF's table: 59 samples,
+     sd 17 min, lag +213/+247 behind the inlet, heights 0.645 of the inlet's less
+     0.191 ft, tied to the Spruce Creek branch rather than the Halifax. Those 59
+     samples are the whole reason it is trustworthy, and they are also all there
+     will ever be — the gauge is long gone, so this calibration is a fossil and
+     cannot be improved by waiting.
+
+     It belongs in a storm app because it is where Jan's water goes: the pond
+     drains to Spruce Creek and this is the measured point on that creek. It is
+     also the furthest up-system spot on this list, at three and a half hours
+     behind the inlet, which is worth seeing on its own — a surge that has
+     already peaked at Ponce is still arriving here. */
+  { key:"sprucepark", name:"Spruce Creek Park",      charted:"Spruce Creek, at the park",
+    lat:29.0927, lng:-80.9751, hi:213, lo:247, measured:true,
+    hs:0.645, ho:-0.191, ls:0.645, lo_:-0.191 },
   { key:"turnbull",  name:"Crook's Corner",          charted:"Turnbull Creek",
     lat:29.043000, lng:-80.959817, hi:120, lo:140, est:true },
   { key:"fairway",   name:"DJM",                     charted:"Aqua Ct tide gauge",
@@ -1924,8 +1940,14 @@ const POND = {
      by nearest coordinate and landed on Three Bridges, which is the Halifax —
      the wrong system entirely. Jan's correction, and the permit agrees with him.
      So the spot is named outright rather than guessed at from distance: a
-     drainage path follows the water, not the crow. */
-  recvKey: "trestle"
+     drainage path follows the water, not the crow.
+
+     And it is SPRUCE CREEK PARK, not the trestle. Both are on Spruce Creek, but
+     the park is the MEASURED one — a Stevens survey, 59 samples, its own height
+     scaling — where the trestle carries the inlet's heights with an estimated
+     lag. Given a choice of two points on the right water, take the one that was
+     actually surveyed. */
+  recvKey: "sprucepark"
 };
 
 /* Whole spans that overlap the window, matching rainAhead's convention: a QPF
