@@ -178,7 +178,7 @@
    BUILD_NUM is what the update check compares, so it must go up on every
    deploy or a phone holding a cached copy will never learn there is a new one.
    ===================================================================== */
-const BUILD_NUM = 8;
+const BUILD_NUM = 9;
 const BUILD_STAMP = "2026-08-06";
 
 /* =====================================================================
@@ -1807,6 +1807,11 @@ function pondHTML(){
   s += `<p class="note">The gap between the last two rows is the whole story: at its own
         hundred-year design storm this pond is engineered to come within about
         ${margin.toFixed(1)} ft of the top of its berm. There is not much room built into it.</p>`;
+  s += `<p class="note"><strong>And the City is rebuilding it.</strong> "Cambridge Canal Stormwater
+        Pond Repair" is out to bid for 2026&ndash;27: a <strong>new pond berm at elevation 8 ft</strong>,
+        about 1,560 square yards of articulated block armouring, a new sluice-gate structure and a
+        new skimmer with a 10 in orifice. So the table above has a shelf life &mdash; when that work
+        is built the berm rises and these numbers need replacing.</p>`;
 
   s += `<div class="rule"></div><div class="grouphd">The drainage window</div>`;
   if(!o){
