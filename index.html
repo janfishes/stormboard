@@ -178,7 +178,7 @@
    BUILD_NUM is what the update check compares, so it must go up on every
    deploy or a phone holding a cached copy will never learn there is a new one.
    ===================================================================== */
-const BUILD_NUM = 10;
+const BUILD_NUM = 11;
 const BUILD_STAMP = "2026-08-06";
 
 /* =====================================================================
@@ -1430,6 +1430,27 @@ function gaugeMapSVG(live){
      labels cannot overlap each other. A leader line back to the pin keeps a
      nudged label attached to its own dot. */
   const labels = [];
+  /* Your spots get their names too, and they go into the SAME label array as
+     everything else. The alternative — drawing them as their own pass — is the
+     bug this file has already made twice: labels that do not share the
+     de-collision set look fine until the day two of them land together. They are
+     drawn in a lighter grey and a shade smaller so the map still reads
+     gauges-first, since a gauge is a measurement and a spot is a forecast.
+     The inlet is skipped: it is already lettered as the fixed PONCE INLET mark,
+     and labelling it twice is how a map starts arguing with itself. */
+  /* A spot and a gauge can be the SAME place under two names — the Dunlawton
+     bridge is both a forecast spot and a storm-deployment site — and labelling
+     it twice makes the map argue with itself. Compare on a normalised name and
+     drop the spot's copy, keeping the gauge's, because the gauge is the thing
+     that might actually measure. Nearby-but-different names ("Ponce Inlet" and
+     "Ponce Inlet beach") are left alone: they are two real places. */
+  const norm = t => String(t).toLowerCase().replace(/[^a-z0-9]+/g, "");
+  const taken = new Set(pts.map(p => norm(p.label)).concat(["ponceinlet", "you"]));
+  for(const l of spots){
+    if(l.key === "inlet" || taken.has(norm(l.name))) continue;
+    const x = X(l.lng), y = Y(l.lat);
+    labels.push({ x, y, right: x < W*0.55, t:l.name, col:"#6B7683", off:9, small:true });
+  }
   for(const p of pts){
     const x = X(p.lng), y = Y(p.lat);
     const right = x < W*0.55;                       // keep labels inside the box
@@ -1482,7 +1503,8 @@ function gaugeMapSVG(live){
              stroke="${l.col}" stroke-width="1" stroke-opacity=".55"/>`;
     }
     s += `<text x="${tx.toFixed(1)}" y="${(l.ly + 3.6).toFixed(1)}" font-family="monospace"
-      font-size="10.5" font-weight="700" text-anchor="${anchor}" fill="${l.col}"
+      font-size="${l.small ? "9.2" : "10.5"}" font-weight="${l.small ? "600" : "700"}"
+      text-anchor="${anchor}" fill="${l.col}"
       stroke="#EDF2F6" stroke-width="3.2" paint-order="stroke">${esc(l.t)}</text>`;
   }
   s += `</svg>`;
@@ -1775,9 +1797,17 @@ function groundHTML(){
       s += `<p>The forecast peak stays <strong>${margin.toFixed(1)} ft below</strong> the ground
         under you, through ${esc(fmtDT(out.horizon))}.</p>`;
     }
-    if(loc && thresholds[loc.key] == null)
-      s += `<div class="btnrow"><button class="btn small" onclick="seedThreshold('${loc.key}', ${gMll.toFixed(2)})">
-        Use this as my mark at ${esc(loc.name)}</button></div>`;
+    /* Assign to ANY spot, not just the nearest. The nearest is only right when
+       you are standing at the spot; for a bank top at DJM you walk to the bank,
+       read the ground there, and hang it on DJM deliberately. */
+    s += `<div class="btnrow"><select id="groundSpot" class="btn small">`;
+    for(const l of LOCATIONS)
+      s += `<option value="${esc(l.key)}"${l.key === loc.key ? " selected" : ""}>${esc(l.name)}</option>`;
+    s += `</select><button class="btn small" onclick="seedThresholdPicked(${gMll.toFixed(2)})">
+      Use ${gMll.toFixed(1)} ft as my mark there</button></div>`;
+    s += `<p class="note"><strong>Standing where you want the answer is the whole trick.</strong>
+      To learn when a canal tops its bank, walk onto the bank, read the ground there, and hang it on
+      that spot. A reading taken over the water gives you the water's surface, not the bank.</p>`;
   }
 
   s += `<details class="help"><summary>How much to trust this</summary><div>
@@ -2218,6 +2248,10 @@ function resetChecks(){
 /* Offered by the ground card: adopt the looked-up ground elevation as the mark
    for the nearest spot, so the water table starts warning against it. Labelled
    "ground" rather than "dock" so it is never mistaken for a measured height. */
+function seedThresholdPicked(ft){
+  const sel = document.getElementById("groundSpot");
+  if(sel && sel.value) seedThreshold(sel.value, ft);
+}
 function seedThreshold(key, ft){
   if(!isFinite(ft)) return;
   thresholds[key] = { ft: Math.round(ft*100)/100, label:"ground" };
@@ -2227,10 +2261,21 @@ function editThreshold(key){
   const loc = LOCATIONS.find(l => l.key === key);
   if(!loc) return;
   const cur = thresholds[key] || {};
+  /* This prompt used to say only "measure it once at a known low water", which
+     assumed the reader already knew what MLLW was and how to get onto it. Both
+     ways of finding the number are spelled out instead, because a box you cannot
+     fill in is the same as a feature that is not there. */
   const raw = prompt(
     "Height above MLLW, in feet, of the thing you want to know about at " + loc.name +
-    ".\n\nThe dock deck, the ramp apron, the yard, the low point of the road out — whatever you\n" +
-    "actually care about. Measure it once at a known low water and it is good forever.\n\n" +
+    ".\nThe dock deck, the ramp, the yard, the bank of the canal, the low point of the road out.\n\n" +
+    "TWO WAYS TO GET THE NUMBER\n\n" +
+    "1. Let the app read it. Stand on the thing, open the \"Your ground\" card, tap\n" +
+    "   Use my location, and hand the elevation to this spot. Good for ground and\n" +
+    "   banks; it is bare earth, so it will not know about your dock or your slab.\n\n" +
+    "2. Measure it once, with a tape. At any moment you like, note the water height\n" +
+    "   this app shows for " + loc.name + ", then measure straight up from the water\n" +
+    "   to your mark. Add the two. That is the number, and it is good forever.\n" +
+    "   Example: app says 1.2 ft, you measure 3.5 ft up to the dock -> enter 4.7\n\n" +
     "Leave blank to clear.", cur.ft != null ? String(cur.ft) : "");
   if(raw === null) return;
   if(raw.trim() === ""){ delete thresholds[key]; saveThresholds(); render(); return; }
