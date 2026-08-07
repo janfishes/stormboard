@@ -178,7 +178,7 @@
    BUILD_NUM is what the update check compares, so it must go up on every
    deploy or a phone holding a cached copy will never learn there is a new one.
    ===================================================================== */
-const BUILD_NUM = 9;
+const BUILD_NUM = 10;
 const BUILD_STAMP = "2026-08-06";
 
 /* =====================================================================
@@ -1633,6 +1633,177 @@ function gaugesHTML(){
 }
 
 /* =====================================================================
+   YOUR GROUND — how high the land is where you are, and what that means
+
+   Two public services, both CORS-open from a browser (verified in one, not with
+   curl, which cannot see CORS at all):
+
+     USGS 3DEP via EPQS   bare-earth ground elevation, NAVD88 feet, 1 m lidar
+     FEMA NFHL            flood zone and Base Flood Elevation, NAVD88 feet
+
+   Both are NAVD88 and this app's water is MLLW, so both get the SAME +2.25 ft
+   that the gauge card applies: an elevation measured UP from NAVD88 ADDS the
+   separation to become MLLW. That is the conversion this app once had backwards.
+
+   Two datums confirmed rather than assumed: EPQS publishes NAVD88, and FEMA's
+   own study record for Volusia (DFIRM 12127C) reports V_DATUM = NAVD88. This is
+   the FIRST place in this app where a ground elevation can honestly be put
+   beside a tide, because here — unlike the pond drawings — the datum is stated
+   by the source.
+
+   WHAT THIS IS NOT. It compares a still-water level with the height of the
+   dirt. It is not a flood model. It does not know whether water can reach you,
+   it has no waves in it, no rainfall runoff, and no pond overtopping. Bare-earth
+   lidar is the GROUND, not your floor, and a slab usually sits a foot or two
+   above the dirt around it. The card says all of that where it cannot be missed,
+   because a number that looks like a flood forecast and is not is worse than no
+   number at all.
+   ===================================================================== */
+const EPQS_URL = "https://epqs.nationalmap.gov/v1/json";
+const FEMA_NFHL = "https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer";
+const FEMA_ZONE_LAYER = 28;
+let ground = null, groundErr = null;
+
+async function fetchGround(lat, lng){
+  const elev = fetchT(`${EPQS_URL}?x=${lng}&y=${lat}&units=Feet&wkid=4326&includeDate=true`, 15000)
+    .then(r => r.ok ? r.json() : null)
+    .then(j => (j && isFinite(j.value)) ? { navd: j.value, res: j.resolution,
+                 flown: (j.attributes && j.attributes.AcquisitionDate) || null } : null)
+    .catch(() => null);
+  const fema = fetchT(`${FEMA_NFHL}/${FEMA_ZONE_LAYER}/query?geometry=${lng},${lat}`
+      + `&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects`
+      + `&outFields=FLD_ZONE,ZONE_SUBTY,STATIC_BFE,SFHA_TF&returnGeometry=false&f=json`, 15000)
+    .then(r => r.ok ? r.json() : null)
+    .then(j => {
+      const a = j && j.features && j.features[0] && j.features[0].attributes;
+      if(!a) return null;
+      /* FEMA writes -9999 for "no BFE established", which is not an elevation. */
+      const bfe = isFinite(a.STATIC_BFE) && a.STATIC_BFE > -100 ? a.STATIC_BFE : null;
+      return { zone:a.FLD_ZONE, subty:a.ZONE_SUBTY, bfe, sfha:a.SFHA_TF === "T" };
+    })
+    .catch(() => null);
+  const [e, f] = await Promise.all([elev, fema]);
+  if(!e && !f) throw new Error("neither USGS nor FEMA answered");
+  return { elev:e, fema:f, at:{ lat, lng } };
+}
+function refreshGround(){
+  if(!here) return;
+  groundErr = null;
+  fetchGround(here.lat, here.lng)
+    .then(g => { ground = g; groundErr = null; })
+    .catch(e => { groundErr = e.message; })
+    .then(render);
+}
+
+function groundHTML(){
+  let s = "", badge = `<div class="badge water">set your spot</div>`, cls = "";
+  const NA = NAVD88_ABOVE_MLLW;
+
+  /* Nearest modelled spot governs the water height offered for comparison. */
+  let loc = null, nm = null;
+  if(here){
+    let best = Infinity;
+    for(const l of LOCATIONS){ const d = distNm(l, here); if(d < best){ best = d; loc = l; } }
+    nm = best;
+  }
+  const gMll = (ground && ground.elev) ? ground.elev.navd + NA : null;
+  const out  = loc ? spotOutlook(loc, gMll) : null;
+
+  if(gMll != null && out && out.peak){
+    const margin = gMll - out.peak.total;
+    cls   = out.first ? "alarm" : (margin <= 1 ? "rising" : "");
+    badge = out.first ? `<div class="badge sever">forecast reaches your ground</div>`
+          : margin <= 1 ? `<div class="badge warn">${margin.toFixed(1)} ft to spare</div>`
+          : `<div class="badge calm">${margin.toFixed(1)} ft to spare</div>`;
+  } else if(groundErr){ badge = `<div class="badge water">lookup failed</div>`; }
+
+  s += `<div class="card ${cls}" id="ground"><div class="card-head">
+    <div class="card-title">Your ground<span class="sub">USGS lidar &middot; FEMA flood zone</span></div>
+    ${badge}</div><div class="body">`;
+
+  if(!here){
+    s += `<p>Set where you are and this card looks up the height of the land under you from USGS
+      lidar, and your FEMA flood zone, and puts both next to the forecast water.</p>
+      <div class="btnrow"><button class="btn" onclick="locateHere()">Use my location</button
+        ><button class="btn" onclick="typeHere()">Type it in</button></div>
+      <p class="note">Your position is kept on this device only. It is never sent anywhere except
+      to USGS and FEMA to ask about that point, and it is not in this app's source.</p>`;
+    return s + `</div></div>`;
+  }
+  if(groundErr) s += `<p>Couldn't reach the elevation services (${esc(groundErr)}).</p>`;
+  if(!ground && !groundErr) s += `<p class="note">Looking up the ground under you&hellip;</p>`;
+
+  if(ground && ground.elev){
+    const e = ground.elev;
+    s += `<p class="big">${gMll.toFixed(1)} ft <span class="unit">MLLW &mdash; the ground under you</span></p>`;
+    s += `<p class="note">${e.navd.toFixed(2)} ft NAVD88 from USGS 3DEP${
+      e.res ? ", " + e.res + " m lidar" : ""}${e.flown ? ", flown " + esc(String(e.flown)) : ""},
+      converted by adding ${NA} ft. <strong>This is bare earth, not your floor.</strong></p>`;
+  }
+
+  if(ground && ground.fema){
+    const f = ground.fema;
+    s += `<div class="rule"></div><div class="grouphd">FEMA</div>`;
+    if(f.bfe != null){
+      const bM = f.bfe + NA;
+      s += `<p><strong>Zone ${esc(f.zone || "?")}</strong>${f.subty ? " (" + esc(f.subty) + ")" : ""},
+        base flood elevation <strong>${f.bfe.toFixed(1)} ft NAVD88 = ${bM.toFixed(1)} ft MLLW</strong>.
+        That is the 1%-in-any-year flood, and it is the authoritative answer to this question &mdash;
+        far more so than the arithmetic above it.</p>`;
+      if(gMll != null)
+        s += `<p class="note">Your ground sits <strong>${Math.abs(gMll - bM).toFixed(1)} ft
+          ${gMll >= bM ? "above" : "below"}</strong> that flood.</p>`;
+    } else {
+      s += `<p><strong>Zone ${esc(f.zone || "?")}</strong>${f.subty ? " (" + esc(f.subty) + ")" : ""}
+        &mdash; ${f.sfha ? "a special flood hazard area" : "outside the special flood hazard area"},
+        with no base flood elevation published for this point.</p>`;
+    }
+  }
+
+  if(gMll != null && loc && out && out.peak){
+    const margin = gMll - out.peak.total;
+    s += `<div class="rule"></div><div class="grouphd">Against this storm</div>`;
+    s += `<p>Nearest modelled water is <strong>${esc(loc.name)}</strong>, ${nm.toFixed(1)} nm away.
+      It peaks at <strong>${out.peak.total.toFixed(1)} ft MLLW</strong> ${esc(fmtDT(out.peak.t))}.</p>`;
+    if(out.first){
+      s += `<div class="warnblock"><div class="hd">Forecast reaches your ground</div>
+        Still water is forecast to reach ${gMll.toFixed(1)} ft from
+        ${esc(fmtDT(out.first))} to ${esc(fmtDT(out.last))}, peaking
+        ${(out.peak.total - gMll).toFixed(1)} ft over it. Volusia County Emergency Management and
+        the National Weather Service decide whether you leave. Not this page.</div>`;
+    } else {
+      s += `<p>The forecast peak stays <strong>${margin.toFixed(1)} ft below</strong> the ground
+        under you, through ${esc(fmtDT(out.horizon))}.</p>`;
+    }
+    if(loc && thresholds[loc.key] == null)
+      s += `<div class="btnrow"><button class="btn small" onclick="seedThreshold('${loc.key}', ${gMll.toFixed(2)})">
+        Use this as my mark at ${esc(loc.name)}</button></div>`;
+  }
+
+  s += `<details class="help"><summary>How much to trust this</summary><div>
+    <p><strong>It is bare earth, not your house.</strong> Lidar measures the dirt. A slab commonly
+    sits a foot or two above the ground beside it, and a raised house much more. Water at your
+    ground elevation is water in the yard, not water in the living room.</p>
+    <p><strong>It is a water LEVEL, not a flood.</strong> The comparison assumes the still water in
+    the river gets to you and stops there. It carries no waves, no rain running off the land, and
+    nothing from the pond. In this basin rainfall is often the thing that actually floods a
+    property, and the whole reason the pond card exists is that surge and rain together do what
+    neither does alone.</p>
+    <p><strong>Elevation has error in it.</strong> 3DEP is good to a few inches in open ground and
+    worse under trees. Over water it is not ground at all &mdash; it returns the surface, which is why
+    a reading taken in a pond looks impossibly low. If the number below looks wrong for your yard,
+    it may be: measure once with a level from a known mark and use the button to set your own.</p>
+    <p><strong>FEMA's zone and BFE are the real answer</strong> to "will this place flood", because
+    they come from a flood study rather than from arithmetic on a forecast. Volusia's FIRM is
+    effective 2017 and its stated vertical datum is NAVD88, which is why the conversion here is
+    sound where the pond drawings' is not.</p>
+    <p>PLANNING PURPOSES ONLY. DO NOT USE THIS APP FOR NAVIGATION. It does not tell anyone whether
+    to evacuate; an official order overrides everything on this page.</p>
+  </div></details>`;
+  return s + `</div></div>`;
+}
+
+/* =====================================================================
    THE POND
 
    The one stormwater structure near here whose engineering is public. Numbers
@@ -2028,7 +2199,7 @@ let predsErr = null;
 function render(){
   const el = document.getElementById("content");
   if(!el) return;
-  el.innerHTML = alertsHTML() + clockHTML() + waterHTML() + gaugesHTML() + pondHTML() + tropicsHTML() + zoneHTML() + checklistHTML();
+  el.innerHTML = alertsHTML() + clockHTML() + waterHTML() + groundHTML() + gaugesHTML() + pondHTML() + tropicsHTML() + zoneHTML() + checklistHTML();
   const t = threatOf();
   document.getElementById("subLine").innerHTML =
     `Ponce de Leon Inlet &amp; the Halifax River &middot; <span class="badge ${t}">${
@@ -2043,6 +2214,14 @@ function toggleCheck(id, on){ if(on) checks[id] = true; else delete checks[id]; 
 function resetChecks(){
   if(!confirm("Clear every tick on the haul-out list?")) return;
   checks = {}; saveChecks(); render();
+}
+/* Offered by the ground card: adopt the looked-up ground elevation as the mark
+   for the nearest spot, so the water table starts warning against it. Labelled
+   "ground" rather than "dock" so it is never mistaken for a measured height. */
+function seedThreshold(key, ft){
+  if(!isFinite(ft)) return;
+  thresholds[key] = { ft: Math.round(ft*100)/100, label:"ground" };
+  saveThresholds(); render();
 }
 function editThreshold(key){
   const loc = LOCATIONS.find(l => l.key === key);
@@ -2087,8 +2266,8 @@ function editTransfer(){
 function setHere(lat, lng, acc){
   here = { lat, lng, acc: acc || null, when: Date.now() };
   lsSet(LS.here, JSON.stringify(here));
-  zone = null; zoneErr = null; render();
-  refreshZone();
+  zone = null; zoneErr = null; ground = null; groundErr = null; render();
+  refreshZone(); refreshGround();
 }
 function refreshZone(){
   if(!here) return;
@@ -2162,7 +2341,7 @@ function loadAll(){
     })
     .catch(e => { stormsErr = e.message; })
     .then(render);
-  if(here) refreshZone();
+  if(here){ refreshZone(); refreshGround(); }
 }
 
 async function boot(){
