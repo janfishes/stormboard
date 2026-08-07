@@ -178,7 +178,7 @@
    BUILD_NUM is what the update check compares, so it must go up on every
    deploy or a phone holding a cached copy will never learn there is a new one.
    ===================================================================== */
-const BUILD_NUM = 7;
+const BUILD_NUM = 8;
 const BUILD_STAMP = "2026-08-06";
 
 /* =====================================================================
@@ -1600,9 +1600,8 @@ function gaugesHTML(){
       overtop on a rainfall total it has handled before. Read the peak water time in the card above
       against the heaviest rain here: if they land together, that is the bad combination.</p>
       <p class="note"><strong>The pond card below has the numbers</strong> for the one structure near
-      here whose engineering is public &mdash; including the fact that it is PUMPED, which fails worse
-      than a blocked outfall because pumps stop when the POWER does, in the same hours as the heaviest
-      rain.</p></div>`;
+      here whose engineering is public &mdash; how far it sits below the top of its own berm, and how
+      long the tide is holding its outfall shut.</p></div>`;
   }
 
   /* ---- 4. Where they all are ---- */
@@ -1659,14 +1658,26 @@ function gaugesHTML(){
    receiving water goes without falling to its normal low, which is a comparison
    of two heights on the SAME datum and therefore safe to compute.
    ===================================================================== */
+/* Elevations are off the CITY'S OWN CONSTRUCTION DRAWINGS: "Part D, Cambridge
+   Canal Basin Drainage Improvements, Central Area", Quentin L. Hampton
+   Associates, May 2006 — sheet 4 Trailwood Pond Plan, sheet 5 Pond Sections,
+   sheet 6 Pump Station and Overflow Weir, sheet E-01 electrical. These supersede
+   the 2005 permit model: the drawings put the pond discharge at 4.5, where the
+   hydraulic model had a 4.0 weir. Where the two disagree the drawings win.
+
+   The berm is the number that matters and it is not in the permit narrative at
+   all — it is lettered on the pond sections as TOP OF BERM EL. 6.50. */
 const POND = {
   what:  "The pond east of Trailwood Drive",
-  where: "SJRWMD permit 100485, City of Port Orange",
+  where: "the City's own 2006 construction drawings",
   acres: 12.2,
-  normalPool: 2.00, pumpOn: 3.10, pumpOff: 3.00, weirCrest: 4.00,
-  peak25: 5.75, peak100: 6.1, warn: 7.00,
-  pumps: 3, pumpCfs: 100,
-  /* Crooked Creek into Rose Bay — where the outfall discharges. */
+  normalPool: 2.00,        // sheet 5, "NWL = 2.0"
+  pumpOn: 3.10,            // ICPR model; no pump setpoint is lettered on the drawings
+  weirCrest: 4.50,         // sheet 6 section A, "POND DISCHARGE EL. 4.5"
+  berm: 6.50,              // sheet 5, "TOP OF BERM EL. 6.50"
+  peak25: 5.75, peak100: 6.1,
+  pumps: 3, pumpCfs: 100, genKw: 780, fuelGal: 3000,
+  /* Crooked Creek into Rose Bay — sheet 4 names both. */
   recv: { lat: 29.0955, lng: -80.9550 }
 };
 
@@ -1771,10 +1782,11 @@ function pondHTML(){
     <div class="card-title">The pond<span class="sub">stormwater &middot; drainage window</span></div>
     ${badge}</div><div class="body">`;
 
+  const margin = POND.berm - POND.peak100;
   s += `<p><strong>${esc(POND.what)}</strong> &mdash; ${POND.acres} acres, ${POND.pumps} pumps of
-        ${POND.pumpCfs} cfs and a ${POND.weirCrest - POND.normalPool} ft wall of freeboard between
-        its normal pool and the weir it spills over. Nothing measures it. These are DESIGN figures
-        from the engineering model in ${esc(POND.where)}, not as-builts.</p>`;
+        ${POND.pumpCfs} cfs, and <strong>${(POND.berm - POND.normalPool).toFixed(1)} ft</strong> from
+        its normal pool to the top of the berm. Nothing measures it. Every figure below is lettered
+        on ${esc(POND.where)}.</p>`;
 
   s += `<div class="wrapx"><table class="grid"><thead><tr>
     <th>Level</th><th class="num">Above normal pool</th><th>What happens</th>
@@ -1784,11 +1796,17 @@ function pondHTML(){
       ft === POND.normalPool ? "&mdash;" : "+" + (ft - POND.normalPool).toFixed(2) + " ft"
     }</td><td>${why}</td></tr>`;
   s += rung("Normal pool", POND.normalPool, "Where it sits between storms");
-  s += rung("Pumps start", POND.pumpOn, `${POND.pumps} &times; ${POND.pumpCfs} cfs, staged. <strong>City-operated &mdash; and they need power</strong>`);
-  s += rung("Weir crest", POND.weirCrest, "It starts spilling to Crooked Creek. This is normal, it is the outlet", "near");
+  s += rung("Pumps start", POND.pumpOn, `${POND.pumps} &times; ${POND.pumpCfs} cfs, staged, on a
+        ${POND.genKw} kW generator with an automatic transfer switch`);
+  s += rung("Pond discharge", POND.weirCrest, "It starts spilling over the weir to Crooked Creek. This is normal, it is the outlet", "near");
   s += rung("25-year design peak", POND.peak25, "Over the weir by " + (POND.peak25 - POND.weirCrest).toFixed(2) + " ft");
-  s += rung("100-year design peak", POND.peak100, "Over the weir by about " + (POND.peak100 - POND.weirCrest).toFixed(1) + " ft", "over");
+  s += rung("100-year design peak", POND.peak100, `Over the weir by about ${(POND.peak100 - POND.weirCrest).toFixed(1)} ft &mdash;
+        and <strong>only ${margin.toFixed(1)} ft under the berm</strong>`, "over");
+  s += rung("Top of berm", POND.berm, "<strong>It comes over the top</strong>", "over");
   s += `</tbody></table></div>`;
+  s += `<p class="note">The gap between the last two rows is the whole story: at its own
+        hundred-year design storm this pond is engineered to come within about
+        ${margin.toFixed(1)} ft of the top of its berm. There is not much room built into it.</p>`;
 
   s += `<div class="rule"></div><div class="grouphd">The drainage window</div>`;
   if(!o){
@@ -1838,16 +1856,25 @@ function pondHTML(){
     be compared with a tide. So the ladder above is spacings, and no line on it is tied to a tide
     height. That restraint is deliberate: getting a datum sign backwards is exactly what once made
     this app read every measured water level 4.5 ft low.</p>
-    <p><strong>These are design values, not as-builts.</strong> They come from the improved-condition
-    hydraulic model in the permit file. The application that contains them is for the SOUTH area of
-    the basin; this pond is in the CENTRAL area, which the same document says "will be submitted for
-    permitting under a separate application". A later sequence of the permit should hold what was
-    actually built.</p>
-    <p><strong>The pumps are not yours and they need power.</strong> The file is explicit: a
-    permanent pumping station "to allow the pond to be pumped down before and during impending
-    extreme storms", and "the Port Orange Public Works Department will have the only access to
-    control of the pumping station during emergencies". In a hurricane, plan on them being off &mdash;
-    the hours the power fails are the same hours the rain is heaviest.</p>
+    <p><strong>Where these came from.</strong> The City publishes the construction drawings for this
+    pond: "Part D, Cambridge Canal Basin Drainage Improvements, Central Area", May 2006. The normal
+    water level and the top of berm are lettered on sheet 5, the pond discharge elevation on sheet 6,
+    the generator on sheet E-01. They supersede the 2005 permit's hydraulic model, which had the weir
+    a half foot lower, and they carry the berm height, which the permit narrative never states at all.
+    The pump start elevation is still the model's &mdash; no setpoint is lettered on these sheets.</p>
+    <p><strong>The pumps have their own power, and an earlier version of this card was wrong to say
+    otherwise.</strong> Sheet E-01 schedules a ${POND.genKw} kW diesel generator on a
+    ${POND.fuelGal.toLocaleString()} gallon double-wall tank behind a 1,200 A AUTOMATIC transfer
+    switch, so a utility failure starts them without anyone attending. That is a real piece of
+    hurricane engineering and it should not be written off. What it does not make them is
+    unconditional: a generator can fail, and a tank that size is on the order of two to four days of
+    running depending on load &mdash; that last figure is an estimate from the generator rating, not
+    a number off the drawing. The City has also had the station out for pump repair in 2025 and has
+    upgrades out to bid now, so "is it all working today" is a fair question to ask them.</p>
+    <p><strong>Control still is not yours.</strong> The permit is explicit that "the Port Orange
+    Public Works Department will have the only access to control of the pumping station during
+    emergencies". Nothing on this page changes what the pond does; it only tells you where it is in
+    its own range.</p>
     <p><strong>Nothing measures this pond.</strong> There is no gauge in it, no telemetry and no
     public feed. The drainage window above is computed from the tide and surge forecast for the
     water it drains into; it is not a reading of the pond.</p>
