@@ -178,7 +178,7 @@
    BUILD_NUM is what the update check compares, so it must go up on every
    deploy or a phone holding a cached copy will never learn there is a new one.
    ===================================================================== */
-const BUILD_NUM = 17;
+const BUILD_NUM = 18;
 const BUILD_STAMP = "2026-08-06";
 
 /* =====================================================================
@@ -417,7 +417,7 @@ const LS = {
   lags:'tide-lags', pos:'tide-positions', added:'tide-added-spots', hidden:'tide-hidden',
   // ours
   thresholds:'storm-thresholds', checks:'storm-checks', lead:'storm-lead-hours', shown:'storm-shown',
-  here:'storm-here', transfer:'storm-surge-transfer'
+  here:'storm-here', transfer:'storm-surge-transfer', whatif:'storm-whatif'
 };
 function lsGet(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } }
 function lsSet(k,v){ try{ localStorage.setItem(k,v); }catch(e){} }
@@ -427,6 +427,8 @@ let thresholds = {};      // spot key -> { ft, label }
 let checks = {};          // checklist id -> true
 let leadHours = 24;       // how far ahead of tropical-storm-force wind you want to be done
 let surgeTransfer = 1.0;  // see SURGE TRANSFER below
+/* A WHAT-IF PEAK, in feet, or null. See setWhatIf(). */
+let whatIf = null;
 let here = null;          // {lat,lng,acc,when} — where "your zone" is answered for
 
 function loadPrefs(){
@@ -454,6 +456,7 @@ function loadPrefs(){
   try{ checks = JSON.parse(lsGet(LS.checks) || "{}") || {}; }catch(e){ checks = {}; }
   const lh = parseFloat(lsGet(LS.lead));    if(lh >= 0 && lh <= 96) leadHours = lh;
   const st = parseFloat(lsGet(LS.transfer)); if(st > 0.2 && st <= 2) surgeTransfer = st;
+  const wi = parseFloat(lsGet(LS.whatif)); whatIf = (wi > 0 && wi <= 30) ? wi : null;
   try{ const h = JSON.parse(lsGet(LS.here) || "null"); if(h && isFinite(h.lat)) here = h; }catch(e){}
 }
 const saveThresholds = () => lsSet(LS.thresholds, JSON.stringify(thresholds));
@@ -639,6 +642,22 @@ async function fetchSurge(){
    not know the surge, and holding the last value flat would quietly invent a
    forecast that keeps going. A card that says "beyond the surge forecast" is
    correct; one that shows a number is not. */
+/* THE WHAT-IF SCALE. When NOAA names a surge height for a storm, this lets you
+   put that number in and see it play out. It SCALES the whole P-ETSS series so
+   its peak equals yours, rather than replacing it: the model's TIMING is the
+   part worth keeping — when the surge arrives, how long it lasts, how it rides
+   the tide — and the magnitude is the part a warning is actually telling you.
+   Multiplying keeps the shape and imposes the size.
+
+   It refuses when the model has no storm in it to scale. Stretching a 0.1 ft
+   quiet-weather wiggle up to 6 ft would produce a shape with no physical
+   meaning, drawn with the same confidence as a forecast. */
+function whatIfScale(){
+  if(whatIf == null || !surge) return 1;
+  const pk = Math.max.apply(null, surge.ss);
+  if(!(pk > 0.25)) return 1;
+  return whatIf/pk;
+}
 function surgeAt(t){
   if(!surge) return null;
   const ms = t.getTime();
@@ -647,7 +666,7 @@ function surgeAt(t){
     const a = surge.t[i].getTime(), b = surge.t[i+1].getTime();
     if(ms >= a && ms <= b){
       const f = (b === a) ? 0 : (ms - a)/(b - a);
-      return surge.ss[i] + (surge.ss[i+1] - surge.ss[i])*f;
+      return (surge.ss[i] + (surge.ss[i+1] - surge.ss[i])*f) * whatIfScale();
     }
   }
   return null;
@@ -1382,10 +1401,21 @@ function waterHTML(){
           The surge half is not affected.</p>`;
   }
   if(surge){
+    /* A what-if has to be impossible to mistake for the forecast. It gets the
+       loud block, not a footnote, and every number above it is the made-up one
+       until it is cleared. */
+    if(whatIf != null){
+      s += `<div class="warnblock"><div class="hd">What-if, not a forecast</div>
+        Every height above is scaled to a peak surge of <strong>${whatIf.toFixed(1)} ft</strong>
+        that you typed in, keeping the model's timing. This is not what NOAA is forecasting.
+        <button class="btn small" onclick="setWhatIf()">change</button>
+        <button class="btn small" onclick="clearWhatIf()">back to the real forecast</button></div>`;
+    }
     s += `<p class="note">Surge forecast runs to ${esc(fmtDT(surge.end))}; nothing beyond that is
           shown rather than held flat. Surge is carried from the inlet to each spot delayed by that
           spot's own tide lag and multiplied by ${surgeTransfer.toFixed(2)}
-          <button class="btn small" onclick="editTransfer()">change</button></p>`;
+          <button class="btn small" onclick="editTransfer()">change</button>
+          ${whatIf == null ? `<button class="btn small" onclick="setWhatIf()">what if NOAA says a number?</button>` : ""}</p>`;
   }
   s += `<details class="help"><summary>What these numbers are, and are not</summary><div class="body2">
     <p><strong>This is still water, not the water you will see.</strong> It is the astronomical tide
@@ -2427,6 +2457,28 @@ function editLead(){
   const v = parseFloat(raw);
   if(!(v >= 0 && v <= 96)){ alert("Give a number of hours between 0 and 96."); return; }
   leadHours = v; lsSet(LS.lead, String(v)); render();
+}
+function clearWhatIf(){ whatIf = null; lsSet(LS.whatif, ""); render(); }
+function setWhatIf(){
+  const pk = surge ? Math.max.apply(null, surge.ss) : null;
+  const raw = prompt(
+    "WHAT-IF: put in a peak surge height and see it play out.\n\n" +
+    "Use this when NOAA names a number for a storm. Enter it in FEET OF SURGE — the\n" +
+    "amount ON TOP of the normal tide.\n\n" +
+    "CAREFUL, because two different numbers get called storm surge:\n" +
+    "  - NHC's coloured flooding map is water ABOVE GROUND, and it already has the\n" +
+    "    tide in it. Do NOT put that number here; it would be counted twice.\n" +
+    "  - The one to use is surge, storm tide anomaly, or 'above normal tide'.\n\n" +
+    "The forecast's own peak right now is " + (pk == null ? "unknown" : pk.toFixed(1) + " ft") + ".\n" +
+    "Timing stays the model's; only the size becomes yours.\n\n" +
+    "Leave blank to go back to the real forecast.",
+    whatIf == null ? "" : String(whatIf));
+  if(raw === null) return;
+  if(raw.trim() === ""){ whatIf = null; lsSet(LS.whatif, ""); render(); return; }
+  const v = parseFloat(raw);
+  if(!(v > 0 && v <= 30)){ alert("Give a surge height between 0 and 30 feet."); return; }
+  if(!(pk > 0.25)){ alert("The surge model has no storm in it to scale right now. Try again when one is forecast."); return; }
+  whatIf = v; lsSet(LS.whatif, String(v)); render();
 }
 function editTransfer(){
   const raw = prompt(
