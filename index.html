@@ -178,7 +178,7 @@
    BUILD_NUM is what the update check compares, so it must go up on every
    deploy or a phone holding a cached copy will never learn there is a new one.
    ===================================================================== */
-const BUILD_NUM = 16;
+const BUILD_NUM = 17;
 const BUILD_STAMP = "2026-08-06";
 
 /* =====================================================================
@@ -1988,11 +1988,11 @@ const POND = {
      inference dressed as fact.
 
      So: the spot is NAMED rather than derived, and nothing is claimed about the
-     path beyond what a document says. Spruce Creek Park is the point, because it
-     is the MEASURED station on that water — a Stevens survey with its own height
-     scaling — where the trestle carries the inlet's heights on an estimated lag.
-     Given two points on the right water, take the one somebody surveyed. */
-  recvKey: "sprucepark"
+     path beyond what a document says. ROSE BAY BRIDGE is the point — Jan's call,
+     and it is the closest MEASURED station to the pond: a Stevens survey with
+     its own height scaling, 60 samples, an hour behind the inlet. Spruce Creek
+     Park was used briefly and is further up a different system entirely. */
+  recvKey: "rosebay"
 };
 
 /* Whole spans that overlap the window, matching rainAhead's convention: a QPF
