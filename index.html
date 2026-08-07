@@ -122,6 +122,30 @@
   .conewrap{background:var(--shoal);border-top:1px solid var(--hair);border-bottom:1px solid var(--hair)}
   svg.cone{display:block;width:100%;height:auto}
 
+  /* The gauge map. touch-action:none is what stops a drag on it from scrolling
+     the page out from under the gesture; overflow:hidden is what keeps the
+     picture inside its frame while the pan group is being dragged. */
+  .mapwrap{position:relative;background:var(--shoal);border-top:1px solid var(--hair);
+    border-bottom:1px solid var(--hair);overflow:hidden;touch-action:none;user-select:none}
+  .gmap-svg{display:block;width:100%;height:auto;cursor:grab}
+  .mapwrap .pinhit{cursor:pointer}
+  .mapctl{position:absolute;top:8px;right:8px;display:flex;flex-direction:column;gap:5px}
+  .mapctl .mbtn{width:34px;height:34px;padding:0;line-height:1;font-family:var(--mono);font-size:17px;
+    font-weight:700;color:var(--ink);background:rgba(255,255,255,.93);border:1px solid var(--ink);
+    border-radius:4px;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,.35)}
+  .mapctl .mbtn.wide{height:26px;font-size:10px;letter-spacing:.1em}
+  .maphint{position:absolute;left:8px;bottom:7px;font-family:var(--mono);font-size:9.5px;
+    color:#fff;background:rgba(0,0,0,.62);padding:2px 6px;border-radius:3px;pointer-events:none}
+  .pinfo{border:2px solid var(--ink);border-radius:4px;padding:9px 11px;margin:10px 0}
+  .pinfo-hd{display:flex;justify-content:space-between;align-items:center;gap:10px;
+    font-size:14px;margin-bottom:6px}
+  .pinfo-status{font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:.1em;
+    color:var(--ink-soft);margin-bottom:6px}
+  .pinfo-status.onair{color:var(--sever)}
+  table.pinfo-t th{width:31%;text-align:left;vertical-align:top;font-size:11px;
+    font-family:var(--mono);color:var(--ink-soft);font-weight:700;text-transform:uppercase;letter-spacing:.05em}
+  table.pinfo-t td{font-size:12.5px;line-height:1.45}
+
   .err{border:1px solid var(--sever);background:var(--sever-soft);padding:10px 12px;border-radius:4px;
     font-size:13px;line-height:1.5;margin-bottom:12px}
   .loading{font-family:var(--mono);font-size:12px;color:var(--ink-soft);padding:20px 2px}
@@ -178,8 +202,8 @@
    BUILD_NUM is what the update check compares, so it must go up on every
    deploy or a phone holding a cached copy will never learn there is a new one.
    ===================================================================== */
-const BUILD_NUM = 19;
-const BUILD_STAMP = "2026-08-06";
+const BUILD_NUM = 20;
+const BUILD_STAMP = "2026-08-07";
 
 /* =====================================================================
    WHERE, AND WHAT WE TALK TO
@@ -317,22 +341,66 @@ const NAVD88_ABOVE_MLLW = 2.25;
 
    DELIBERATELY NOT IN THIS LIST: any private position. The repo is public. Your
    own location is drawn from `storm-here`, which never leaves the device. */
+/* Each entry carries what the tap panel says about it: what KIND of gauge it is,
+   where the sensor sits, what it measured, and — the question this list exists
+   to answer — WHEN it is switched on. Those four lines are the whole reason a
+   dot on this map is worth touching, and they are hard-coded for the same reason
+   the positions are: they have to be readable with no signal. */
 const GAUGE_SITES = [
   // Storm-deployment sites — dark until a hurricane is coming
-  { k:"stn", id:"FLVOL03142", lat:29.1025, lng:-80.9712, name:"Rose Bay Bridge" },
-  { k:"stn", id:"FLVOL03144", lat:29.0511, lng:-80.9595, name:"Turnbull Creek, at the trestle" },
-  { k:"stn", id:"FLVOL17777", lat:29.1486, lng:-80.9742, name:"Dunlawton bridge" },
-  { k:"stn", id:"FLVOL03140", lat:29.1459, lng:-80.9821, name:"Port Orange Park pier" },
-  { k:"stn", id:"FLVOL03145", lat:29.0314, lng:-80.9159, name:"New Smyrna Beach pier" },
-  { k:"stn", id:"FLVOL03143", lat:29.0850, lng:-80.9244, name:"Ponce Inlet beach" },
+  { k:"stn", id:"FLVOL03142", lat:29.1025, lng:-80.9712, name:"Rose Bay Bridge",
+    mount:"Rigadoon Fish Camp, at the Rose Bay bridge", meas:"Peak storm tide, then the water level through the storm" },
+  { k:"stn", id:"FLVOL03144", lat:29.0511, lng:-80.9595, name:"Turnbull Creek Trestle",
+    mount:"Power pole on the SE side of the bridge, between the road bridge and the railroad bridge",
+    meas:"Peak storm tide, then the water level through the storm" },
+  { k:"stn", id:"FLVOL17777", lat:29.1486, lng:-80.9742, name:"Dunlawton bridge",
+    mount:"SR-421 bridge over the Halifax", meas:"Peak storm tide, then the water level through the storm" },
+  { k:"stn", id:"FLVOL03140", lat:29.1459, lng:-80.9821, name:"Port Orange Park pier",
+    mount:"The pier at Port Orange Park", meas:"Peak storm tide, then the water level through the storm" },
+  { k:"stn", id:"FLVOL03145", lat:29.0314, lng:-80.9159, name:"New Smyrna Beach pier",
+    mount:"The New Smyrna Beach fishing pier", meas:"Peak storm tide, then the water level through the storm" },
+  { k:"stn", id:"FLVOL03143", lat:29.0850, lng:-80.9244, name:"Ponce Inlet beach",
+    mount:"Ponce Inlet State Park", meas:"Peak storm tide, then the water level through the storm" },
+  /* A gauge that is on all year. It is 8 km up Spruce Creek, above the tidal
+     reach, so it is RUNOFF and not a tide — which is exactly why it earns its
+     place: it sees the fresh water coming down before Spruce Creek Park does. */
+  { k:"perm", id:"02248000", lat:29.0508, lng:-81.0464, name:"Spruce Creek near Samsula",
+    mount:"On Spruce Creek 8 km upstream, above the tidal reach and upstream of Spruce Creek Park",
+    meas:"Gage height and discharge — runoff, NOT a tide",
+    hist:"Record back to 1951; real-time and on every day of the year." },
   // Gauges that existed and were switched off
-  { k:"off", id:"290855080582700", lat:29.1486111, lng:-80.9741667, name:"Port Orange", note:"Matthew, Oct 2016" },
-  { k:"off", id:"291323081010500", lat:29.22225,   lng:-81.0200194, name:"Daytona, Main St", note:"Ian, Sept 2022" },
-  { k:"off", id:"02248060", lat:29.0510963, lng:-80.9594991, name:"Turnbull Creek", note:"ended 2009" },
-  { k:"off", id:"02248030", lat:29.115817,  lng:-80.9872772, name:"Halifax Canal, Harbor Oaks", note:"ended 2013" },
-  { k:"off", id:"02248025", lat:29.1585938, lng:-80.9992216, name:"Reed Canal", note:"ended 2013" },
-  { k:"off", id:"02248053", lat:29.0727625, lng:-80.9900553, name:"Spruce Creek nr NSB", note:"ended 2006" }
+  { k:"off", id:"290855080582700", lat:29.1486111, lng:-80.9741667, name:"Port Orange", note:"Matthew, Oct 2016",
+    mount:"The Dunlawton bridge — 116 m from this app's Dunlawton card",
+    meas:"Water level", hist:"Six readings in its whole record, 5–11 October 2016. That is Hurricane Matthew: it was a storm deployment, never a permanent gauge." },
+  { k:"off", id:"291323081010500", lat:29.22225,   lng:-81.0200194, name:"Daytona, Main St", note:"Ian, Sept 2022",
+    mount:"Halifax River at the Main Street bridge, Daytona Beach",
+    meas:"Water level", hist:"Thirteen readings, September–October 2022 — a Hurricane Ian deployment." },
+  { k:"off", id:"02248060", lat:29.0510963, lng:-80.9594991, name:"Turnbull Creek", note:"ended 2009",
+    mount:"40 m from the Turnbull Bay trestle",
+    meas:"Gage height", hist:"Ran 2000 to 2009, then switched off. The closest thing to a tide gauge this creek has ever had." },
+  { k:"off", id:"02248030", lat:29.115817,  lng:-80.9872772, name:"Halifax Canal, Harbor Oaks", note:"ended 2013",
+    mount:"On the Halifax Canal, 0.68 nm north of the Cambridge Canal pond",
+    meas:"Gage height, discharge AND tidally filtered discharge",
+    hist:"Ended September 2013. This is the one that would have watched the pond's outfall stall — it measured the exact mechanism, on the exact canal." },
+  { k:"off", id:"02248025", lat:29.1585938, lng:-80.9992216, name:"Reed Canal", note:"ended 2013",
+    mount:"Reed Canal, Port Orange", meas:"Gage height", hist:"Ended September 2013." },
+  { k:"off", id:"02248053", lat:29.0727625, lng:-80.9900553, name:"Spruce Creek nr NSB", note:"ended 2006",
+    mount:"Lower Spruce Creek, in the tidal reach", meas:"Gage height", hist:"Ended in 2006." }
 ];
+/* What switches each kind on. The stn line is the one that matters in a
+   hurricane, and it is the reason the map is worth opening at all: those dots
+   turn red by themselves, with no list here to maintain, because the app asks
+   USGS for a BOX and a dormant site comes back with an empty value array. */
+const GAUGE_KIND = {
+  live: { what:"Reporting right now",
+          when:"It is on and sending values. Its readings are in the table above." },
+  perm: { what:"Permanent USGS gauge — on all year",
+          when:"Always on. If it is not drawn as reporting, the feed did not answer, not the gauge." },
+  stn:  { what:"USGS storm-tide sensor SITE — no sensor on it today",
+          when:"Switched on for a storm and nothing else. USGS crews bolt a sensor to this already-surveyed mount when a hurricane is forecast to land here, usually one to three days ahead, and recover it afterwards. This app asks USGS for everything inside a box rather than for a list of gauges, so the moment one starts reporting it appears here on its own." },
+  off:  { what:"Switched off — a gauge that used to measure this water",
+          when:"Never, unless USGS re-establishes it. Shown because it is the record of what was once measured here, and because a dead gauge is why this water is forecast rather than watched." }
+};
 
 /* How close a gauge has to be to one of your spots before its reading is used
    to work out an observed surge. Matched by POSITION, never by name — the
@@ -1445,12 +1513,27 @@ function waterHTML(){
   return s;
 }
 
-/* A locator for the gauges. Inline SVG and no basemap, for the same reason the
-   cone card has none: this app has to draw when the network is at its worst,
-   and a tile server is exactly the wrong dependency to acquire the night before
-   a hurricane. It is a diagram of WHERE, relative to water you already know, not
-   a chart. Your own spots are the reference marks — they are the geography you
-   can actually place. */
+/* A locator for the gauges. Inline SVG and no tile server, for the same reason
+   the cone card has none: this app has to draw when the network is at its worst,
+   and a tile layer is exactly the wrong dependency to acquire the night before a
+   hurricane. It is a diagram of WHERE, relative to water you already know.
+
+   THE NAMES CAME OFF THE MAP (build 20). Every pin used to carry a pill with its
+   name in it, and de-colliding fifteen of them is a bug this file has written
+   three separate times. They were redundant twice over: the table above already
+   names every gauge, and the map's own basemap prints the place names underneath
+   — the pills were landing on top of the very words they were repeating. What
+   replaces them is better than a name: zoom in and TAP a pin, and you get what
+   it is, where exactly it sits, whether it is on, and when it gets switched on.
+   Nothing is lost from the picture and the picture is now legible. */
+
+/* View state, held outside render() so a redraw — and this page redraws every
+   time a feed answers — keeps you where you had zoomed to. */
+let mapView = null;      // {x0,y0,x1,y1} in degrees; null means "fit everything"
+let mapBox = null;       // what was last drawn, so a gesture can do the arithmetic
+let mapPins = [];        // what was last drawn, so a tap can look a pin up
+let selPin = null;       // id of the tapped pin, or null
+
 function gaugeMapSVG(live){
   const liveAt = {};
   for(const g of live) liveAt[g.code] = g;
@@ -1459,31 +1542,87 @@ function gaugeMapSVG(live){
   for(const s of GAUGE_SITES){
     // A catalogued site that is currently reporting is drawn as live, once.
     const l = liveAt[s.id];
-    pts.push({ lat:s.lat, lng:s.lng, kind: l ? "live" : s.k, label:s.name, note:s.note });
+    pts.push({ id:"g:"+s.id, lat:s.lat, lng:s.lng, kind: l ? "live" : s.k,
+               label:s.name, site:s, g:l || null });
   }
   // Anything reporting that is NOT in the catalogue — a brand new deployment.
   for(const g of live){
     if(!GAUGE_SITES.some(s => s.id === g.code)){
-      pts.push({ lat:g.lat, lng:g.lng, kind:"live", label:gaugeName(g.name) });
+      pts.push({ id:"g:"+g.code, lat:g.lat, lng:g.lng, kind:"live",
+                 label:gaugeName(g.name), site:null, g });
     }
   }
   /* THE MAP CARRIES THREE KINDS OF THING AND NO MORE: the gauges, DJM, and you.
-     Every forecast spot used to be drawn on it, and once they were named the map
-     had fifteen labels fighting for room and told you less than the table it was
-     meant to illustrate. A map's job here is to orient you — where the water is
-     being measured, where your dock is, where you are. The rest of the spots are
-     in the table above and their lags are footnoted under the map. */
-  const spots = LOCATIONS.filter(l => isFinite(l.lat) && (l.key === "fairway" || l.key === "inlet"));
-  const all = pts.concat(spots.map(l => ({lat:l.lat, lng:l.lng})));
+     Every forecast spot used to be drawn on it, and fifteen marks told you less
+     than the table they were meant to illustrate. A map's job here is to orient
+     you — where the water is being measured, where your dock is, where you are.
+     The rest of the spots are in the table above and their lags are footnoted
+     under the map. */
+  const spots = LOCATIONS.filter(l => isFinite(l.lat) && l.key === "fairway");
+  const all = pts.concat(spots.map(l => ({lat:l.lat, lng:l.lng})),
+                         [{lat:INLET.lat, lng:INLET.lng}]);
   if(here) all.push({lat:here.lat, lng:here.lng});
   if(!all.length) return "";
 
-  let x0 = Math.min(...all.map(p => p.lng)), x1 = Math.max(...all.map(p => p.lng));
-  let y0 = Math.min(...all.map(p => p.lat)), y1 = Math.max(...all.map(p => p.lat));
-  const px = Math.max((x1-x0)*0.16, 0.012), py = Math.max((y1-y0)*0.10, 0.012);
-  x0 -= px*2.4; x1 += px; y0 -= py; y1 += py;       // extra left margin for labels
-  const kx = Math.cos(((y0+y1)/2)*Math.PI/180);
-  const W = 640, H = Math.max(300, Math.min(560, Math.round(W*((y1-y0)/((x1-x0)*kx)))));
+  /* The natural frame — everything, with a margin. It is computed on every
+     render whatever the zoom, because it is the reference the zoom is measured
+     against and the box a pan is not allowed to leave. */
+  let nx0 = Math.min(...all.map(p => p.lng)), nx1 = Math.max(...all.map(p => p.lng));
+  let ny0 = Math.min(...all.map(p => p.lat)), ny1 = Math.max(...all.map(p => p.lat));
+  /* A generous margin, because the fitted view is now the "zoomed out" end of a
+     range rather than the only view there is: the marks want air around them,
+     and anything you want a closer look at you can zoom into. */
+  const px = Math.max((nx1-nx0)*0.22, 0.02), py = Math.max((ny1-ny0)*0.18, 0.02);
+  nx0 -= px; nx1 += px; ny0 -= py; ny1 += py;
+  const kx = Math.cos(((ny0+ny1)/2)*Math.PI/180);
+  /* THE PICTURE IS SHAPED TO THE PHONE IT IS ON.
+
+     This water runs NORTH-SOUTH: the gauges span 12 nm of latitude against 7 of
+     longitude, so the honest frame is a tall one, and the old fixed ceiling of
+     560 forced the box to be padded out sideways instead — with six kilometres
+     of empty Atlantic. But a map can also be too tall: the whole point of the
+     tap panel is reading it while you can still see the pin you tapped, and on a
+     phone that means the map has to leave room under it.
+
+     So the shape is the water's shape, limited by what the screen can show: at
+     most a little over half the window's height. It is measured rather than
+     assumed because a phone in a case in a hand is not a desk browser, and the
+     number that matters is the one on the glass in front of you. */
+  const W = 640;
+  const vw = Math.max(280, Math.min(window.innerWidth || 640, 900));
+  const vh = Math.max(360, window.innerHeight || 760);
+  const mapCss = vw - 30;                                    // the card's padding
+  const capRatio = Math.max(0.62, Math.min(1.22, vh*0.56/mapCss));
+  const H = Math.round(W * Math.max(0.55, Math.min(capRatio, (ny1-ny0)/((nx1-nx0)*kx))));
+  /* The height is CLAMPED, so the natural box almost never matches the picture's
+     shape exactly. Left alone that is a quiet stretch you can live with on a
+     fixed picture — but the moment it can be zoomed, the scale would change as
+     you zoomed and distances would stop meaning anything. So the box is grown in
+     whichever direction is short until it matches W:H exactly, once, here. Every
+     zoom after that is a uniform shrink of a box that already fits. */
+  const wantDy = (nx1-nx0)*kx*H/W;
+  if(wantDy > ny1-ny0){ const d = (wantDy-(ny1-ny0))/2; ny0 -= d; ny1 += d; }
+  else { const d = ((ny1-ny0)/kx*W/H - (nx1-nx0))/2; nx0 -= d; nx1 += d; }
+
+  let x0 = nx0, x1 = nx1, y0 = ny0, y1 = ny1;
+  if(mapView){
+    /* A saved view is re-derived from its CENTRE and its ZOOM against today's
+       natural box, never used as four raw numbers. The natural box moves — a new
+       gauge starts reporting, the phone is rotated and the picture changes shape
+       — and a box carried over verbatim would then be the wrong shape for the
+       frame it is drawn in, which is a scale that quietly lies. */
+    const z = Math.max(1, Math.min(24, (nx1-nx0)/(mapView.x1-mapView.x0)));
+    const cx = (mapView.x0+mapView.x1)/2, cy = (mapView.y0+mapView.y1)/2;
+    const hw = (nx1-nx0)/z/2, hh = (ny1-ny0)/z/2;
+    x0 = cx-hw; x1 = cx+hw; y0 = cy-hh; y1 = cy+hh;
+    if(x0 < nx0){ x1 += nx0-x0; x0 = nx0; }
+    if(x1 > nx1){ x0 -= x1-nx1; x1 = nx1; }
+    if(y0 < ny0){ y1 += ny0-y0; y0 = ny0; }
+    if(y1 > ny1){ y0 -= y1-ny1; y1 = ny1; }
+    mapView = { x0, y0, x1, y1 };
+  }
+  mapBox = { x0, y0, x1, y1, W, H, nat:{ x0:nx0, y0:ny0, x1:nx1, y1:ny1 } };
+  const zoom = (nx1-nx0)/(x1-x0);
   const X = v => (v - x0)/(x1 - x0)*W, Y = v => H - (v - y0)/(y1 - y0)*H;
 
   /* A REAL BASEMAP UNDER THE PINS. This was a plain grey rectangle, and dots on
@@ -1502,6 +1641,38 @@ function gaugeMapSVG(live){
   const bbox = [x0, y0, x1, y1].map(v => v.toFixed(6)).join(",");
   const base = "https://basemap.nationalmap.gov/arcgis/rest/services/USGSImageryTopo/MapServer/export"
     + `?bbox=${bbox}&bboxSR=4326&imageSR=4326&size=${W},${H}&format=png&transparent=false&f=image`;
+  /* ASK FOR IT AT THE DRAWING SIZE, NOT AT 2x. Doubling the requested pixels
+     looks like a free win for sharpness and is not: ImageryTopo picks its level
+     of detail from the pixel size, and one level in it stops having ocean —
+     half the frame comes back as white and pale-blue blocks — while the place
+     names shrink to nothing. Zooming already buys real detail here, because the
+     BOX narrows at a fixed pixel size, which moves the level of detail the
+     right way instead of the wrong one. Checked side by side, 640 against 1280
+     on the same box. */
+  /* CO-LOCATED MARKS ARE ONE MARK. Two of these sites are the SAME PLACE under
+     two records: the Turnbull Creek trestle is both storm-deployment site
+     FLVOL03144 and switched-off gauge 02248060, and the Dunlawton bridge is both
+     FLVOL17777 and the six-reading Matthew deployment. Drawn straight they came
+     out as a hollow ring with a cross through it — a mark that means nothing and
+     that the legend cannot explain. So a switched-off gauge that sits within
+     about 100 m of a live or deployable site is folded INTO it: one pin, the
+     kind that could still switch on, and the dead gauge's record is carried in
+     its tap panel where it reads as history instead of as a symbol. */
+  const MERGE_NM = 0.06;
+  const pins = [];
+  for(const p of pts){
+    if(p.kind === "off"){
+      const host = pts.find(q => q !== p && q.kind !== "off" && distNm(p, q) < MERGE_NM);
+      if(host){ (host.also = host.also || []).push(p); continue; }
+    }
+    pins.push(p);
+  }
+  for(const l of spots) pins.push({ id:"s:"+l.key, kind:"spot", lat:l.lat, lng:l.lng, label:l.name, loc:l });
+  pins.push({ id:"inlet", kind:"ref", lat:INLET.lat, lng:INLET.lng, label:"Ponce Inlet" });
+  if(here) pins.push({ id:"here", kind:"you", lat:here.lat, lng:here.lng, label:"You" });
+  mapPins = pins;
+  if(selPin && !pins.some(p => p.id === selPin)) selPin = null;
+
   /* PIN COLOURS ARE CHOSEN AGAINST THE IMAGERY, not against a grey box. The
      old palette was picked when this map was a flat #EDF2F6 rectangle, and on
      aerial it fell apart: the storm-deployment rings were dark teal on blue
@@ -1512,63 +1683,46 @@ function gaugeMapSVG(live){
      it holds an edge whatever it lands on. */
   const PIN = {
     live: "#FF3B30",   // reporting now — hot red
+    perm: "#FF3B30",   // permanent gauge, not answering — same red, hollow
     stn:  "#FFD400",   // storm-deployment site — yellow, unmissable on blue
     off:  "#FFFFFF",   // switched off — white, outlined dark
     you:  "#FF00A8",   // you — magenta, occurs nowhere in aerial
-    djm:  "#00E5FF",   // DJM — cyan, distinct from you at a glance
+    spot: "#00E5FF",   // your spots — cyan, distinct from you at a glance
     ref:  "#00E676"    // Ponce Inlet reference — green
   };
-  let s = `<svg class="cone" viewBox="0 0 ${W} ${H}" role="img" aria-label="Where the gauges are">`;
-  s += `<rect width="${W}" height="${H}" fill="#EDF2F6"/>`;
+  let s = `<div class="mapwrap" id="mapwrap">`;
+  s += `<svg id="gmapSvg" class="gmap-svg" viewBox="0 0 ${W} ${H}" role="img"
+         aria-label="Where the gauges are. Zoom in and tap a pin for its details.">`;
+  /* Everything sits in ONE group, because a drag or a pinch moves that group's
+     transform and nothing else while your finger is down. The expensive part —
+     a fresh basemap image for the new box — happens once, when you let go. */
+  s += `<g id="gmapPan">`;
+  s += `<rect x="${-W}" y="${-H}" width="${W*3}" height="${H*3}" fill="#EDF2F6"/>`;
   s += `<image href="${esc(base)}" x="0" y="0" width="${W}" height="${H}"
          preserveAspectRatio="none" opacity="0.92"/>`;
 
-  // Your spots first, so a gauge pin always sits on top of them.
-  for(const l of spots){
-    s += `<circle cx="${X(l.lng).toFixed(1)}" cy="${Y(l.lat).toFixed(1)}" r="4.6" fill="${PIN.djm}" stroke="#0E1F2E" stroke-width="1.6"/>`;
-  }
-  /* Markers and labels are emitted in two passes, because these gauges cluster:
-     four of them sit within a mile of each other around Port Orange, and drawn
-     naively the labels land on top of one another and the map says less than the
-     list it was meant to illustrate.
+  const dot = (x, y, r, fill, stroke, sw) =>
+    `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}"/>`;
 
-     So labels are collected, sorted down the page, and any that would collide
-     with the one above is pushed down — per side, since left- and right-anchored
-     labels cannot overlap each other. A leader line back to the pin keeps a
-     nudged label attached to its own dot. */
-  const labels = [];
-  /* Your spots get their names too, and they go into the SAME label array as
-     everything else. The alternative — drawing them as their own pass — is the
-     bug this file has already made twice: labels that do not share the
-     de-collision set look fine until the day two of them land together. They are
-     drawn in a lighter grey and a shade smaller so the map still reads
-     gauges-first, since a gauge is a measurement and a spot is a forecast.
-     The inlet is skipped: it is already lettered as the fixed PONCE INLET mark,
-     and labelling it twice is how a map starts arguing with itself. */
-  /* A spot and a gauge can be the SAME place under two names — the Dunlawton
-     bridge is both a forecast spot and a storm-deployment site — and labelling
-     it twice makes the map argue with itself. Compare on a normalised name and
-     drop the spot's copy, keeping the gauge's, because the gauge is the thing
-     that might actually measure. Nearby-but-different names ("Ponce Inlet" and
-     "Ponce Inlet beach") are left alone: they are two real places. */
-  const norm = t => String(t).toLowerCase().replace(/[^a-z0-9]+/g, "");
-  const taken = new Set(pts.map(p => norm(p.label)).concat(["ponceinlet", "you"]));
-  for(const l of spots){
-    if(l.key === "inlet" || taken.has(norm(l.name))) continue;
-    const x = X(l.lng), y = Y(l.lat);
-    labels.push({ x, y, right: x < W*0.55, t:l.name, col:PIN.djm, off:9, small:true });
-  }
-  for(const p of pts){
+  for(const p of pins){
     const x = X(p.lng), y = Y(p.lat);
-    const right = x < W*0.55;                       // keep labels inside the box
-    if(p.kind === "live"){
-      s += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="8" fill="${PIN.live}" stroke="#FFFFFF" stroke-width="2.5"/>`;
-      labels.push({ x, y, right, t:p.label, col:PIN.live, off:13 });
+    p.px = x; p.py = y;
+    if(p.kind === "spot"){
+      s += dot(x, y, 4.6, PIN.spot, "#0E1F2E", 1.6);
+    }else if(p.kind === "ref"){
+      s += dot(x, y, 6, PIN.ref, "#FFFFFF", 2.5);
+    }else if(p.kind === "you"){
+      s += `<path d="M${x.toFixed(1)} ${y.toFixed(1)} l-6 -9 a7 7 0 1 1 12 0 z"
+             fill="${PIN.you}" stroke="#FFFFFF" stroke-width="2"/>`;
+    }else if(p.kind === "live"){
+      s += dot(x, y, 8, PIN.live, "#FFFFFF", 2.5);
+    }else if(p.kind === "perm"){
+      // On all year, but not in this answer: hollow, so it never claims a reading.
+      s += dot(x, y, 7, "#FFFFFF", PIN.perm, 2.8);
     }else if(p.kind === "stn"){
       // Hollow and dashed: a site that exists on paper, waiting for a sensor.
       s += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="7" fill="#FFFFFF" fill-opacity=".65"
              stroke="${PIN.stn}" stroke-width="2.6" stroke-dasharray="3.2 2.4"/>`;
-      labels.push({ x, y, right, t:p.label, col:PIN.stn, off:12 });
     }else{
       s += `<g stroke="#0E1F2E" stroke-width="4.4" stroke-linecap="round" stroke-opacity=".65">
         <line x1="${(x-4.5).toFixed(1)}" y1="${(y-4.5).toFixed(1)}" x2="${(x+4.5).toFixed(1)}" y2="${(y+4.5).toFixed(1)}"/>
@@ -1576,76 +1730,256 @@ function gaugeMapSVG(live){
         <g stroke="${PIN.off}" stroke-width="2.1" stroke-linecap="round">
         <line x1="${(x-4.5).toFixed(1)}" y1="${(y-4.5).toFixed(1)}" x2="${(x+4.5).toFixed(1)}" y2="${(y+4.5).toFixed(1)}"/>
         <line x1="${(x-4.5).toFixed(1)}" y1="${(y+4.5).toFixed(1)}" x2="${(x+4.5).toFixed(1)}" y2="${(y-4.5).toFixed(1)}"/></g>`;
-      /* The switched-off gauges were drawn as bare crosses with no label at all,
-         so the map showed four anonymous X's and left you to guess. They are the
-         most interesting marks on it — every one is a gauge that used to measure
-         this water and does not any more — so they get their names like
-         everything else, in the same de-collision pass. */
-      labels.push({ x, y, right, t:p.label, col:PIN.off, off:12, small:true });
     }
   }
-  /* De-collide across ALL labels, not per side. Doing it per side looked right
-     and was not: a left-anchored label and a right-anchored one can sit at the
-     same height and still run into each other in the middle of the map, which
-     is exactly what "Spruce Creek Near Samsula" and "Turnbull Creek, at the
-     trestle" did. One global pass costs a little vertical spread and cannot
-     produce an overlap. */
-  /* The two fixed marks join the SAME de-collision set. Emitting them separately
-     was the second version of this bug: the gauge labels no longer collided with
-     each other, and then PONCE INLET landed on one of them. Any label drawn
-     outside the pass will eventually hit a label inside it. */
-  if(here){
-    const x = X(here.lng), y = Y(here.lat);
-    s += `<path d="M${x.toFixed(1)} ${y.toFixed(1)} l-6 -9 a7 7 0 1 1 12 0 z" fill="${PIN.you}" stroke="#FFFFFF" stroke-width="2"/>`;
-    labels.push({ x, y: y-23, mid:true, t:"YOU", col:PIN.you });
+  /* The selected pin gets a ring in both black and white, because one colour is
+     always the wrong colour somewhere on aerial imagery. */
+  const sel = pins.find(p => p.id === selPin);
+  if(sel){
+    s += `<circle cx="${sel.px.toFixed(1)}" cy="${sel.py.toFixed(1)}" r="14" fill="none"
+           stroke="#000000" stroke-width="3.6" stroke-opacity=".55"/>`;
+    s += `<circle cx="${sel.px.toFixed(1)}" cy="${sel.py.toFixed(1)}" r="14" fill="none"
+           stroke="#FFFFFF" stroke-width="1.8" stroke-dasharray="4 3"/>`;
   }
-  const ix = X(INLET.lng), iy = Y(INLET.lat);
-  s += `<circle cx="${ix.toFixed(1)}" cy="${iy.toFixed(1)}" r="6" fill="${PIN.ref}" stroke="#FFFFFF" stroke-width="2.5"/>`;
-  labels.push({ x:ix, y:iy-21, mid:true, t:"PONCE INLET", col:PIN.ref });
-
-  const GAP = 16;   // pills are taller than bare text; 14 let them touch
-  labels.sort((a,b) => a.y - b.y);
-  let last = -1e9;
-  for(const l of labels){
-    l.ly = Math.max(l.y, last + GAP);
-    last = l.ly;
+  /* Hit targets last and invisible, sized for a FINGER rather than for the dot.
+     A 6-pixel pin is not a tap target on a phone; 16 is. They are emitted after
+     the marks so the topmost one wins, and they carry a <title> so the same tap
+     works as a hover tooltip on a desktop. */
+  for(const p of pins){
+    s += `<circle class="pinhit" data-pin="${esc(p.id)}" cx="${p.px.toFixed(1)}" cy="${p.py.toFixed(1)}"
+           r="16" fill="transparent"><title>${esc(p.label)}</title></circle>`;
   }
-  for(const l of labels){
-    const tx = l.mid ? l.x : (l.right ? l.x + l.off : l.x - l.off);
-    const anchor = l.mid ? "middle" : (l.right ? "start" : "end");
-    if(!l.mid && Math.abs(l.ly - l.y) > 2){
-      s += `<line x1="${(l.right ? l.x+7 : l.x-7).toFixed(1)}" y1="${l.y.toFixed(1)}"
-             x2="${tx.toFixed(1)}" y2="${(l.ly - 3).toFixed(1)}"
-             stroke="${l.col}" stroke-width="1" stroke-opacity=".55"/>`;
-    }
-    /* PILLS, because a white halo was never going to be enough on aerial
-       imagery — the basemap is dark water in one place and bright roof in the
-       next, and any single halo colour loses somewhere.
-
-       The pill has to be sized by hand: SVG will not measure text for you. That
-       is only safe because these labels are MONOSPACE, where every character
-       advances the same 0.6 em, so the width is arithmetic rather than a guess.
-       If the font ever stops being monospace this sum quietly stops fitting.
-
-       The pill is black with white text as asked, and keeps a thin border in the
-       pin's own colour — reporting, storm-deployment, switched off, you. That
-       distinction used to be carried by the text colour, and white-on-black
-       everywhere would have thrown it away. */
-    const fs = l.small ? 9.2 : 10.5;
-    const padX = 4, padY = 2.6;
-    const w = l.t.length*fs*0.6 + padX*2;
-    const hh = fs + padY*2;
-    const rx = anchor === "middle" ? tx - w/2 : (anchor === "start" ? tx - padX : tx - w + padX);
-    s += `<rect x="${rx.toFixed(1)}" y="${(l.ly - hh/2 + 1).toFixed(1)}"
-      width="${w.toFixed(1)}" height="${hh.toFixed(1)}" rx="3"
-      fill="#000000" fill-opacity="0.82" stroke="${l.col}" stroke-width="1.1" stroke-opacity="0.9"/>`;
-    s += `<text x="${tx.toFixed(1)}" y="${(l.ly + fs*0.35 + 1).toFixed(1)}" font-family="monospace"
-      font-size="${fs}" font-weight="${l.small ? "600" : "700"}"
-      text-anchor="${anchor}" fill="#FFFFFF">${esc(l.t)}</text>`;
-  }
-  s += `</svg>`;
+  s += `</g></svg>`;
+  s += `<div class="mapctl">
+    <button class="mbtn" onclick="mapZoom(1.8)" aria-label="Zoom in">+</button>
+    <button class="mbtn" onclick="mapZoom(1/1.8)" aria-label="Zoom out">&minus;</button>
+    <button class="mbtn wide" onclick="mapHome()" aria-label="Fit everything">FIT</button>
+  </div>`;
+  s += `<div class="maphint">${zoom > 1.02 ? `&times;${zoom.toFixed(1)} &middot; ` : ""}pinch or scroll to zoom
+        &middot; drag to move &middot; tap a pin</div>`;
+  s += `</div>`;
   return s;
 }
+
+/* ---- The tap panel: what a dot on that map actually is ----
+   A map pin can only carry one bit of information — colour — and the four
+   questions worth asking about a gauge are what it is, where exactly it sits,
+   whether it is on, and when it gets switched on. Those go here, on demand, for
+   one pin at a time. This is what the name pills were traded for, and it is a
+   great deal more than a name. */
+function pinPanelHTML(){
+  const p = mapPins.find(q => q.id === selPin);
+  if(!p) return `<p class="note" style="margin-top:8px">Tap any pin on the map for what it is, where
+    exactly it sits, whether it is switched on, and what switches it on.</p>`;
+
+  const row = (k, v) => `<tr><th>${k}</th><td>${v}</td></tr>`;
+  const pos = `${p.lat.toFixed(5)}, ${p.lng.toFixed(5)}`;
+  const dNm = distNm(INLET, p), brg = degToCompass(bearing(INLET, p));
+  /* The inlet does not get told how far it is from itself. */
+  let where = `${pos}<br><span class="note">${dNm < 0.05 ? "the reference point itself"
+    : `${dNm.toFixed(1)} nm ${brg} of Ponce Inlet`}`;
+  if(here && distNm(here, p) >= 0.05)
+    where += ` &middot; ${distNm(here, p).toFixed(1)} nm ${degToCompass(bearing(here, p))} of you`;
+  where += `</span>`;
+
+  let s = `<div class="pinfo"><div class="pinfo-hd">
+    <strong>${esc(p.label)}</strong>
+    <button class="btn small" onclick="pickPin(null)">close</button></div>`;
+
+  if(p.kind === "spot" || p.kind === "ref" || p.kind === "you"){
+    /* The three marks that are not gauges. They are on the map as the geography
+       you can actually place, and saying so plainly is better than letting a tap
+       do nothing. */
+    const what = p.kind === "you" ? "Where this app thinks you are &mdash; from this device, and it never leaves it"
+      : p.kind === "ref" ? "The reference. Every tide and surge on this page is computed from Ponce Inlet and then shifted to a spot"
+      : "One of your forecast spots &mdash; a prediction, not a measurement";
+    s += `<table class="grid pinfo-t"><tbody>${row("What", what)}${row("Where", where)}`;
+    if(p.loc){
+      const o = offsets[p.loc.key] || { hi:p.loc.hi, lo:p.loc.lo };
+      s += row("Tide lag", `+${o.hi} min at high, +${o.lo} min at low, behind the inlet`);
+      s += row("Heights", p.loc.measured ? "measured on this water" : "inlet heights, estimated lag");
+    }
+    if(p.kind === "you" && here && here.when)
+      s += row("Fixed", esc(fmtDT(new Date(here.when))));
+    return s + `</tbody></table></div>`;
+  }
+
+  const site = p.site, g = p.g, kd = GAUGE_KIND[p.kind] || GAUGE_KIND.off;
+  const on = p.kind === "live";
+  s += `<div class="pinfo-status ${on ? "onair" : ""}">${on ? "ONLINE &mdash; reporting" : "OFFLINE &mdash; nothing coming from it"}</div>`;
+  s += `<table class="grid pinfo-t"><tbody>`;
+  s += row("What it is", kd.what);
+  s += row("Where", where);
+  if(site && site.mount) s += row("Exactly", esc(site.mount));
+  s += row("Measures", site && site.meas ? esc(site.meas)
+        : g ? esc(Object.keys(g.parms).map(c => PARM_NAMES[c] || c).join(", ")) : "&mdash;");
+  s += row("Switched on", kd.when);
+  if(site && site.hist) s += row("Its record", esc(site.hist));
+  /* A merged mark says both halves of its own history, which is the whole
+     justification for merging it: one pin, two records, no ambiguous symbol. */
+  for(const a of (p.also || [])){
+    s += row("Also here", `<strong>${esc(a.label)}</strong> &mdash; a gauge that stood on this same
+      spot and is switched off. ${a.site && a.site.hist ? esc(a.site.hist) : ""}`);
+  }
+  s += row("USGS id", `${esc(site ? site.id : g.code)}${
+    /^\d+$/.test(site ? site.id : g.code)
+      ? ` &middot; <a href="https://waterdata.usgs.gov/monitoring-location/${esc(site ? site.id : g.code)}/"
+          target="_blank" rel="noopener">USGS page</a>` : ""}`);
+  if(g){
+    const p62 = g.parms[P_ESTUARY], pst = g.parms[P_STAGE] || g.parms[P_NAVD], pfl = g.parms[P_FLOW];
+    if(p62) s += row("Water now", `<strong>${g.mllw.toFixed(2)} ft MLLW</strong> at ${esc(fmtT(p62.t))}`);
+    else if(pst) s += row("Stage now", `<strong>${pst.v.toFixed(2)} ft</strong> at ${esc(fmtT(pst.t))}
+      <span class="note">on the gauge's own datum &mdash; not comparable with a tide</span>`);
+    if(pfl) s += row("Flow now", `${Math.round(pfl.v).toLocaleString()} cu ft/s`);
+    if(g.match) s += row("Sits on", `${esc(g.match.loc.name)}, ${(g.match.d*1852).toFixed(0)} m away &mdash;
+      close enough to check that spot's forecast against a real reading`);
+  }
+  return s + `</tbody></table></div>`;
+}
+/* USGS parameter codes, for a gauge that turns up with no catalogue entry. */
+const PARM_NAMES = {
+  "62620":"Estuary or ocean water surface elevation (NAVD88)",
+  "63160":"Stream water level elevation (NAVD88)",
+  "00065":"Gage height",
+  "00060":"Discharge"
+};
+
+/* ---- Zoom, pan and tap ----
+   Zoom here is not a CSS scale of a fixed picture: it narrows the BOX, and the
+   basemap is then fetched for that narrower box at the same pixel size. So
+   zooming in buys real resolution — the imagery genuinely gets sharper and the
+   creeks separate — instead of magnifying blur. The cost is one image request
+   when you let go, which is why the gesture itself only moves a transform. */
+function mapZoom(f){
+  if(!mapBox) return;
+  const c = mapBox.W/2, cy = mapBox.H/2;
+  mapCommit(c - f*c, cy - f*cy, f);
+}
+function mapHome(){ mapView = null; render(); }
+
+/* Turn a transform applied to the pan group into the box it leaves showing.
+   A point u in the old drawing appears at k*u + t, so the viewport [0,W] is
+   showing old coordinates (0-t)/k to (W-t)/k. Everything else is clamping. */
+function mapCommit(tx, ty, k){
+  const b = mapBox;
+  if(!b) return;
+  const dx = b.x1 - b.x0, dy = b.y1 - b.y0;
+  const ux0 = -tx/k, ux1 = (b.W - tx)/k, uy0 = -ty/k, uy1 = (b.H - ty)/k;
+  let x0 = b.x0 + ux0/b.W*dx, x1 = b.x0 + ux1/b.W*dx;
+  let y1 = b.y0 + (b.H - uy0)/b.H*dy, y0 = b.y0 + (b.H - uy1)/b.H*dy;
+
+  const natW = b.nat.x1 - b.nat.x0, natH = b.nat.y1 - b.nat.y0;
+  /* Zoom is clamped at both ends and for different reasons. Out: the fitted box
+     is the whole story, and letting it go further just shrinks the pins into a
+     grey field. In: ×24 is about the point where USGS's imagery stops having
+     more to give and you are looking at magnified pixels. */
+  let z = Math.max(1, Math.min(24, natW/(x1 - x0)));
+  if(z <= 1.002){ mapView = null; render(); return; }
+  const cx = (x0 + x1)/2, cy = (y0 + y1)/2, hw = natW/z/2, hh = natH/z/2;
+  x0 = cx - hw; x1 = cx + hw; y0 = cy - hh; y1 = cy + hh;
+  // A pan cannot leave the fitted box: there is nothing out there to look at.
+  if(x0 < b.nat.x0){ x1 += b.nat.x0 - x0; x0 = b.nat.x0; }
+  if(x1 > b.nat.x1){ x0 -= x1 - b.nat.x1; x1 = b.nat.x1; }
+  if(y0 < b.nat.y0){ y1 += b.nat.y0 - y0; y0 = b.nat.y0; }
+  if(y1 > b.nat.y1){ y0 -= y1 - b.nat.y1; y1 = b.nat.y1; }
+  mapView = { x0, y0, x1, y1 };
+  render();
+}
+function pickPin(id){
+  selPin = (id && id === selPin) ? null : id;
+  render();
+}
+
+/* The gesture layer. One pointer drags, two pinch, the wheel zooms about the
+   cursor. While a gesture runs, only the pan group's transform changes; the
+   box — and with it the basemap request — is committed once at the end. */
+let gest = null, mapT = { tx:0, ty:0, k:1 }, wheelTimer = null;
+function mapApplyLive(){
+  const g = document.getElementById("gmapPan");
+  if(g) g.setAttribute("transform", `translate(${mapT.tx.toFixed(2)},${mapT.ty.toFixed(2)}) scale(${mapT.k.toFixed(4)})`);
+}
+function mapScale(){                       // SVG user units per CSS pixel
+  const svg = document.getElementById("gmapSvg");
+  if(!svg || !mapBox) return 1;
+  const r = svg.getBoundingClientRect();
+  return r.width ? mapBox.W/r.width : 1;
+}
+function mapDown(e){
+  const t = e.target;
+  if(!t.closest || !t.closest("#mapwrap") || t.closest(".mapctl")) return;
+  if(!gest) gest = { pts:new Map(), moved:false, base:{ tx:mapT.tx, ty:mapT.ty, k:mapT.k } };
+  gest.pts.set(e.pointerId, { x:e.clientX, y:e.clientY, x0:e.clientX, y0:e.clientY });
+  if(gest.pts.size === 2){
+    const [a, b] = [...gest.pts.values()];
+    gest.d0 = Math.hypot(a.x - b.x, a.y - b.y) || 1;
+    gest.m0 = { x:(a.x0 + b.x0)/2, y:(a.y0 + b.y0)/2 };
+    gest.base = { tx:mapT.tx, ty:mapT.ty, k:mapT.k };
+    gest.moved = true;                     // a pinch is never a tap
+  }
+  e.preventDefault();
+}
+function mapMove(e){
+  if(!gest || !gest.pts.has(e.pointerId)) return;
+  const p = gest.pts.get(e.pointerId);
+  p.x = e.clientX; p.y = e.clientY;
+  const sc = mapScale(), B = gest.base;
+  if(gest.pts.size === 1){
+    const dx = p.x - p.x0, dy = p.y - p.y0;
+    if(Math.hypot(dx, dy) > 5) gest.moved = true;
+    mapT = { tx:B.tx + dx*sc, ty:B.ty + dy*sc, k:B.k };
+  }else{
+    const [a, b] = [...gest.pts.values()];
+    const f = (Math.hypot(a.x - b.x, a.y - b.y) || 1)/gest.d0;
+    const svg = document.getElementById("gmapSvg");
+    const r = svg.getBoundingClientRect();
+    const m0 = { x:(gest.m0.x - r.left)*sc, y:(gest.m0.y - r.top)*sc };
+    const m1 = { x:((a.x + b.x)/2 - r.left)*sc, y:((a.y + b.y)/2 - r.top)*sc };
+    // Scale about the first midpoint, then follow the midpoint as it moves.
+    mapT = { k:B.k*f, tx:f*B.tx + m1.x - f*m0.x, ty:f*B.ty + m1.y - f*m0.y };
+  }
+  mapApplyLive();
+  e.preventDefault();
+}
+function mapUp(e){
+  if(!gest) return;
+  gest.pts.delete(e.pointerId);
+  if(gest.pts.size) return;                // still pinching with the other finger
+  const moved = gest.moved, T = mapT;
+  gest = null;
+  mapT = { tx:0, ty:0, k:1 };
+  if(moved) mapCommit(T.tx, T.ty, T.k);    // a tap is handled by the click below
+  else mapApplyLive();
+}
+function mapWheel(e){
+  const t = e.target;
+  if(!t.closest || !t.closest("#mapwrap") || !mapBox) return;
+  e.preventDefault();
+  const svg = document.getElementById("gmapSvg"), r = svg.getBoundingClientRect(), sc = mapScale();
+  const f = Math.exp(-e.deltaY*0.0018);
+  const cx = (e.clientX - r.left)*sc, cy = (e.clientY - r.top)*sc;
+  mapT = { k:mapT.k*f, tx:f*mapT.tx + cx*(1 - f), ty:f*mapT.ty + cy*(1 - f) };
+  mapApplyLive();
+  /* The wheel fires in a burst. Committing on every notch would ask USGS for a
+     new image a dozen times on one flick, so the transform runs live and the
+     box is committed when the flick stops. */
+  clearTimeout(wheelTimer);
+  wheelTimer = setTimeout(() => { const T = mapT; mapT = { tx:0, ty:0, k:1 }; mapCommit(T.tx, T.ty, T.k); }, 220);
+}
+function mapClick(e){
+  const hit = e.target.closest && e.target.closest("[data-pin]");
+  if(!hit) return;
+  pickPin(hit.getAttribute("data-pin"));
+}
+window.addEventListener("pointerdown", mapDown, { passive:false });
+window.addEventListener("pointermove", mapMove, { passive:false });
+window.addEventListener("pointerup", mapUp);
+window.addEventListener("pointercancel", mapUp);
+window.addEventListener("wheel", mapWheel, { passive:false });
+window.addEventListener("click", mapClick);
+/* The map is shaped to the window, so a rotation is a new picture. Debounced,
+   because a rotate fires a burst of these and each one redraws the page. */
+let resizeT = null;
+window.addEventListener("resize", () => { clearTimeout(resizeT); resizeT = setTimeout(render, 300); });
 function gaugeLegendHTML(nLive){
   /* The lags moved off the map and into this footnote. They are the number that
      makes every other spot work — how far behind the inlet its tide runs — and
@@ -1657,7 +1991,12 @@ function gaugeLegendHTML(nLive){
      A legend that cannot show its own key is not a legend. */
   const chip = (c, g) => `<span style="background:#0E1F2E;color:${c};border-radius:3px;
     padding:1px 5px;font-weight:700">${g}</span>`;
+  /* The legend carries the whole key now that the pins are unlabelled, so it has
+     to name every mark that can appear — including the hollow red one, which is
+     a permanent gauge that did not answer this time and is NOT the same claim as
+     a dashed yellow site with no sensor on it. */
   let s = `<p class="note">${chip("#FF3B30","&#9679;")} reporting now (${nLive}) &nbsp;
+    ${chip("#FF3B30","&#9711;")} permanent gauge, not answering &nbsp;
     ${chip("#FFD400","&#9711;")} storm-deployment site, dark until a hurricane &nbsp;
     ${chip("#FFFFFF","&#10005;")} switched off &nbsp;
     ${chip("#FF00A8","&#9679;")} you &nbsp;
@@ -1794,11 +2133,13 @@ function gaugesHTML(){
 
   /* ---- 4. Where they all are ---- */
   s += `</div>${gaugeMapSVG(tidal.concat(creek))}<div class="body">`;
+  s += pinPanelHTML();
   s += gaugeLegendHTML(tidal.length + creek.length);
-  s += `<p class="note">Hollow rings are USGS storm-deployment sites: the position is already surveyed
-        and the mounting chosen, and a sensor goes on it when a hurricane is forecast to land here.
-        Nothing is there today. If one is switched on it turns into a filled dot and starts reporting in
-        the table above on its own.</p>`;
+  s += `<p class="note">Dashed yellow rings are USGS storm-deployment sites: the position is already
+        surveyed and the mounting chosen, and a sensor goes on it when a hurricane is forecast to land
+        here. Nothing is there today. If one is switched on it turns into a filled red dot and starts
+        reporting in the table above on its own. <strong>Tap any pin</strong> for what it is, exactly
+        where it sits, whether it is online, and what switches it on.</p>`;
 
   s += `<details class="help"><summary>Where these gauges are, and why there are so few</summary><div class="body2">
     <p><strong>Nothing permanent measures the tide in Port Orange or New Smyrna Beach.</strong> Checked

@@ -136,6 +136,36 @@ predicted astronomical = the surge that actually happened**, and prints it besid
 what P-ETSS forecast. That check has never been possible on this water. Matched
 by **position, never by name**.
 
+### The gauge map: no names on it, and you can zoom it
+
+The pins carry **no labels**. They used to, and de-colliding fifteen name pills
+on a 640-pixel picture is a bug this file wrote three separate times — while the
+USGS ImageryTopo basemap underneath was already printing *Port Orange*, *Rose
+Bay* and *Ponce De Leon Inlet* in the very places the pills were covering up.
+
+What replaces a name is more than a name. **Pinch, scroll or use the +/− buttons
+to zoom, drag to move, and tap any pin** for what it is, exactly where it sits
+(including the mounting — "power pole on the SE side of the bridge"), what it
+measures, whether it is online right now, and **when it gets switched on**. FIT
+returns to the whole picture.
+
+Zoom narrows the *bounding box* and re-fetches the basemap for it at the same
+pixel size, so zooming in buys real resolution instead of magnifying blur. Asking
+for the image at 2× the drawing size does the opposite: ImageryTopo drops to a
+level of detail with no ocean tiles and unreadable place names.
+
+Two of these sites are the **same place under two records** — the Turnbull Creek
+trestle is both storm-deployment site FLVOL03144 and switched-off gauge 02248060,
+and the Dunlawton bridge is both FLVOL17777 and the six-reading Matthew
+deployment. Drawn straight they came out as a hollow ring with a cross through
+it, a symbol meaning nothing. A switched-off gauge within ~100 m of a deployable
+one is now folded into it: one pin, and the dead gauge's record is in the tap
+panel as history.
+
+The picture's **shape is measured off the window**, capped at a little over half
+the screen height, so the panel you just opened is on screen with the pin you
+tapped.
+
 ### Two datum rules
 
 `62620` (estuary/ocean water surface elevation) and `63160` are **NAVD88**;
