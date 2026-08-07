@@ -178,7 +178,7 @@
    BUILD_NUM is what the update check compares, so it must go up on every
    deploy or a phone holding a cached copy will never learn there is a new one.
    ===================================================================== */
-const BUILD_NUM = 15;
+const BUILD_NUM = 16;
 const BUILD_STAMP = "2026-08-06";
 
 /* =====================================================================
@@ -369,11 +369,9 @@ const BUILTIN_LOCATIONS = [
     hs:1, ho:0, ls:1, lo_:0, measured:true },
   { key:"threebr",   name:"Three Bridges",           charted:"Halifax River at the three spans",
     lat:29.086350, lng:-80.968633, hi:75,  lo:90,  est:true },
-  /* ROSE BAY BRIDGE — measured, and squarely on the pond's drainage path.
-     A Stevens survey station in WTF: 60 samples, sd 17 min, lag +60/+80, heights
-     0.780 of the inlet's less 0.311 ft, on the Rose Bay branch. The Cambridge
-     Canal pond discharges to Crooked Creek and into Rose Bay before it ever
-     reaches Spruce Creek, so this is the first measured water downstream of it. */
+  /* ROSE BAY BRIDGE — measured. A Stevens survey station in WTF: 60 samples,
+     sd 17 min, lag +60/+80, heights 0.780 of the inlet's less 0.311 ft, on the
+     Rose Bay branch. */
   { key:"rosebay",   name:"Rose Bay Bridge",         charted:"Rose Bay, at the bridge",
     lat:29.1029, lng:-80.9713, hi:60,  lo:80,  measured:true,
     hs:0.780, ho:-0.311, ls:0.780, lo_:-0.311 },
@@ -1981,21 +1979,19 @@ const POND = {
   berm: 6.50,              // sheet 5, "TOP OF BERM EL. 6.50"
   peak25: 5.75, peak100: 6.1,
   pumps: 3, pumpCfs: 100, genKw: 780, fuelGal: 3000,
-  /* WHERE THIS POND'S WATER ACTUALLY GOES. The drawings letter the immediate
-     outfall as Crooked Creek, and the 2005 permit names the receiving waterbody
-     as SPRUCE CREEK. An earlier version of this card picked its receiving water
-     by nearest coordinate and landed on Three Bridges, which is the Halifax —
-     the wrong system entirely. Jan's correction, and the permit agrees with him.
-     So the spot is named outright rather than guessed at from distance: a
-     drainage path follows the water, not the crow.
+  /* WHERE THE POND'S WATER GOES, AND WHERE THIS STOPS GUESSING.
+     The drawings name a discharge trough and a receiving system; the 2005 permit
+     names SPRUCE CREEK as the receiving waterbody. Earlier versions of this card
+     went further than that on their own — first picking the receiving water by
+     nearest coordinate, which landed on Three Bridges and put the pond on the
+     Halifax, then writing out a chain of creeks that Jan corrected. Both were
+     inference dressed as fact.
 
-     WHICH POINT IS STILL OPEN. The documents give Crooked Creek -> Rose Bay and
-     no further; anything past that is inference and one version of this comment
-     inferred wrongly. Jan asked for Spruce Creek, so Spruce Creek Park is used —
-     the MEASURED point on that water rather than the trestle, which — a Stevens survey, 59 samples, its own height
-     scaling — where the trestle carries the inlet's heights with an estimated
-     lag. Given a choice of two points on the right water, take the one that was
-     actually surveyed. */
+     So: the spot is NAMED rather than derived, and nothing is claimed about the
+     path beyond what a document says. Spruce Creek Park is the point, because it
+     is the MEASURED station on that water — a Stevens survey with its own height
+     scaling — where the trestle carries the inlet's heights on an estimated lag.
+     Given two points on the right water, take the one somebody surveyed. */
   recvKey: "sprucepark"
 };
 
@@ -2112,7 +2108,7 @@ function pondHTML(){
   s += rung("Normal pool", POND.normalPool, "Where it sits between storms");
   s += rung("Pumps start", POND.pumpOn, `${POND.pumps} &times; ${POND.pumpCfs} cfs, staged, on a
         ${POND.genKw} kW generator with an automatic transfer switch`);
-  s += rung("Pond discharge", POND.weirCrest, "It starts spilling over the weir into Crooked Creek. This is normal, it is the outlet", "near");
+  s += rung("Pond discharge", POND.weirCrest, "It starts spilling over the weir. This is normal, it is the outlet", "near");
   s += rung("25-year design peak", POND.peak25, "Over the weir by " + (POND.peak25 - POND.weirCrest).toFixed(2) + " ft");
   s += rung("100-year design peak", POND.peak100, `Over the weir by about ${(POND.peak100 - POND.weirCrest).toFixed(1)} ft &mdash;
         and <strong>only ${margin.toFixed(1)} ft under the berm</strong>`, "over");
