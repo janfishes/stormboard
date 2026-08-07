@@ -178,7 +178,7 @@
    BUILD_NUM is what the update check compares, so it must go up on every
    deploy or a phone holding a cached copy will never learn there is a new one.
    ===================================================================== */
-const BUILD_NUM = 18;
+const BUILD_NUM = 19;
 const BUILD_STAMP = "2026-08-06";
 
 /* =====================================================================
@@ -1502,6 +1502,22 @@ function gaugeMapSVG(live){
   const bbox = [x0, y0, x1, y1].map(v => v.toFixed(6)).join(",");
   const base = "https://basemap.nationalmap.gov/arcgis/rest/services/USGSImageryTopo/MapServer/export"
     + `?bbox=${bbox}&bboxSR=4326&imageSR=4326&size=${W},${H}&format=png&transparent=false&f=image`;
+  /* PIN COLOURS ARE CHOSEN AGAINST THE IMAGERY, not against a grey box. The
+     old palette was picked when this map was a flat #EDF2F6 rectangle, and on
+     aerial it fell apart: the storm-deployment rings were dark teal on blue
+     water and simply disappeared, and the switched-off crosses were mid-grey on
+     everything. These are saturated enough to survive dark water, green
+     hammock, grey roof and white sand, and none of them is a colour that occurs
+     naturally in this frame. Every mark also carries a white or dark outline, so
+     it holds an edge whatever it lands on. */
+  const PIN = {
+    live: "#FF3B30",   // reporting now — hot red
+    stn:  "#FFD400",   // storm-deployment site — yellow, unmissable on blue
+    off:  "#FFFFFF",   // switched off — white, outlined dark
+    you:  "#FF00A8",   // you — magenta, occurs nowhere in aerial
+    djm:  "#00E5FF",   // DJM — cyan, distinct from you at a glance
+    ref:  "#00E676"    // Ponce Inlet reference — green
+  };
   let s = `<svg class="cone" viewBox="0 0 ${W} ${H}" role="img" aria-label="Where the gauges are">`;
   s += `<rect width="${W}" height="${H}" fill="#EDF2F6"/>`;
   s += `<image href="${esc(base)}" x="0" y="0" width="${W}" height="${H}"
@@ -1509,7 +1525,7 @@ function gaugeMapSVG(live){
 
   // Your spots first, so a gauge pin always sits on top of them.
   for(const l of spots){
-    s += `<circle cx="${X(l.lng).toFixed(1)}" cy="${Y(l.lat).toFixed(1)}" r="3.4" fill="#8A94A0"/>`;
+    s += `<circle cx="${X(l.lng).toFixed(1)}" cy="${Y(l.lat).toFixed(1)}" r="4.6" fill="${PIN.djm}" stroke="#0E1F2E" stroke-width="1.6"/>`;
   }
   /* Markers and labels are emitted in two passes, because these gauges cluster:
      four of them sit within a mile of each other around Port Orange, and drawn
@@ -1540,21 +1556,24 @@ function gaugeMapSVG(live){
   for(const l of spots){
     if(l.key === "inlet" || taken.has(norm(l.name))) continue;
     const x = X(l.lng), y = Y(l.lat);
-    labels.push({ x, y, right: x < W*0.55, t:l.name, col:"#6B7683", off:9, small:true });
+    labels.push({ x, y, right: x < W*0.55, t:l.name, col:PIN.djm, off:9, small:true });
   }
   for(const p of pts){
     const x = X(p.lng), y = Y(p.lat);
     const right = x < W*0.55;                       // keep labels inside the box
     if(p.kind === "live"){
-      s += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="8" fill="#B23A2B" stroke="#FFFFFF" stroke-width="2.5"/>`;
-      labels.push({ x, y, right, t:p.label, col:"#B23A2B", off:13 });
+      s += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="8" fill="${PIN.live}" stroke="#FFFFFF" stroke-width="2.5"/>`;
+      labels.push({ x, y, right, t:p.label, col:PIN.live, off:13 });
     }else if(p.kind === "stn"){
       // Hollow and dashed: a site that exists on paper, waiting for a sensor.
       s += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="7" fill="#FFFFFF" fill-opacity=".65"
-             stroke="#0A5A78" stroke-width="2.2" stroke-dasharray="3.2 2.4"/>`;
-      labels.push({ x, y, right, t:p.label, col:"#0A5A78", off:12 });
+             stroke="${PIN.stn}" stroke-width="2.6" stroke-dasharray="3.2 2.4"/>`;
+      labels.push({ x, y, right, t:p.label, col:PIN.stn, off:12 });
     }else{
-      s += `<g stroke="#8A94A0" stroke-width="2" stroke-linecap="round">
+      s += `<g stroke="#0E1F2E" stroke-width="4.4" stroke-linecap="round" stroke-opacity=".65">
+        <line x1="${(x-4.5).toFixed(1)}" y1="${(y-4.5).toFixed(1)}" x2="${(x+4.5).toFixed(1)}" y2="${(y+4.5).toFixed(1)}"/>
+        <line x1="${(x-4.5).toFixed(1)}" y1="${(y+4.5).toFixed(1)}" x2="${(x+4.5).toFixed(1)}" y2="${(y-4.5).toFixed(1)}"/></g>
+        <g stroke="${PIN.off}" stroke-width="2.1" stroke-linecap="round">
         <line x1="${(x-4.5).toFixed(1)}" y1="${(y-4.5).toFixed(1)}" x2="${(x+4.5).toFixed(1)}" y2="${(y+4.5).toFixed(1)}"/>
         <line x1="${(x-4.5).toFixed(1)}" y1="${(y+4.5).toFixed(1)}" x2="${(x+4.5).toFixed(1)}" y2="${(y-4.5).toFixed(1)}"/></g>`;
       /* The switched-off gauges were drawn as bare crosses with no label at all,
@@ -1562,7 +1581,7 @@ function gaugeMapSVG(live){
          most interesting marks on it — every one is a gauge that used to measure
          this water and does not any more — so they get their names like
          everything else, in the same de-collision pass. */
-      labels.push({ x, y, right, t:p.label, col:"#8A94A0", off:12, small:true });
+      labels.push({ x, y, right, t:p.label, col:PIN.off, off:12, small:true });
     }
   }
   /* De-collide across ALL labels, not per side. Doing it per side looked right
@@ -1577,14 +1596,14 @@ function gaugeMapSVG(live){
      outside the pass will eventually hit a label inside it. */
   if(here){
     const x = X(here.lng), y = Y(here.lat);
-    s += `<path d="M${x.toFixed(1)} ${y.toFixed(1)} l-6 -9 a7 7 0 1 1 12 0 z" fill="#0F7B7B" stroke="#FFFFFF" stroke-width="2"/>`;
-    labels.push({ x, y: y-23, mid:true, t:"YOU", col:"#0F7B7B" });
+    s += `<path d="M${x.toFixed(1)} ${y.toFixed(1)} l-6 -9 a7 7 0 1 1 12 0 z" fill="${PIN.you}" stroke="#FFFFFF" stroke-width="2"/>`;
+    labels.push({ x, y: y-23, mid:true, t:"YOU", col:PIN.you });
   }
   const ix = X(INLET.lng), iy = Y(INLET.lat);
-  s += `<circle cx="${ix.toFixed(1)}" cy="${iy.toFixed(1)}" r="6" fill="#1B6F3B" stroke="#FFFFFF" stroke-width="2.5"/>`;
-  labels.push({ x:ix, y:iy-21, mid:true, t:"PONCE INLET", col:"#0E1F2E" });
+  s += `<circle cx="${ix.toFixed(1)}" cy="${iy.toFixed(1)}" r="6" fill="${PIN.ref}" stroke="#FFFFFF" stroke-width="2.5"/>`;
+  labels.push({ x:ix, y:iy-21, mid:true, t:"PONCE INLET", col:PIN.ref });
 
-  const GAP = 14;
+  const GAP = 16;   // pills are taller than bare text; 14 let them touch
   labels.sort((a,b) => a.y - b.y);
   let last = -1e9;
   for(const l of labels){
@@ -1599,11 +1618,30 @@ function gaugeMapSVG(live){
              x2="${tx.toFixed(1)}" y2="${(l.ly - 3).toFixed(1)}"
              stroke="${l.col}" stroke-width="1" stroke-opacity=".55"/>`;
     }
-    s += `<text x="${tx.toFixed(1)}" y="${(l.ly + 3.6).toFixed(1)}" font-family="monospace"
-      font-size="${l.small ? "9.2" : "10.5"}" font-weight="${l.small ? "600" : "700"}"
-      text-anchor="${anchor}" fill="${l.col}"
-      stroke="#FFFFFF" stroke-width="3.4" stroke-opacity="0.95"
-      paint-order="stroke">${esc(l.t)}</text>`;
+    /* PILLS, because a white halo was never going to be enough on aerial
+       imagery — the basemap is dark water in one place and bright roof in the
+       next, and any single halo colour loses somewhere.
+
+       The pill has to be sized by hand: SVG will not measure text for you. That
+       is only safe because these labels are MONOSPACE, where every character
+       advances the same 0.6 em, so the width is arithmetic rather than a guess.
+       If the font ever stops being monospace this sum quietly stops fitting.
+
+       The pill is black with white text as asked, and keeps a thin border in the
+       pin's own colour — reporting, storm-deployment, switched off, you. That
+       distinction used to be carried by the text colour, and white-on-black
+       everywhere would have thrown it away. */
+    const fs = l.small ? 9.2 : 10.5;
+    const padX = 4, padY = 2.6;
+    const w = l.t.length*fs*0.6 + padX*2;
+    const hh = fs + padY*2;
+    const rx = anchor === "middle" ? tx - w/2 : (anchor === "start" ? tx - padX : tx - w + padX);
+    s += `<rect x="${rx.toFixed(1)}" y="${(l.ly - hh/2 + 1).toFixed(1)}"
+      width="${w.toFixed(1)}" height="${hh.toFixed(1)}" rx="3"
+      fill="#000000" fill-opacity="0.82" stroke="${l.col}" stroke-width="1.1" stroke-opacity="0.9"/>`;
+    s += `<text x="${tx.toFixed(1)}" y="${(l.ly + fs*0.35 + 1).toFixed(1)}" font-family="monospace"
+      font-size="${fs}" font-weight="${l.small ? "600" : "700"}"
+      text-anchor="${anchor}" fill="#FFFFFF">${esc(l.t)}</text>`;
   }
   s += `</svg>`;
   return s;
@@ -1614,10 +1652,17 @@ function gaugeLegendHTML(nLive){
      they are far more use as a readable list than as fifteen labels crowding a
      600-pixel picture. A measured lag is marked, because a measured one and an
      estimated one are not the same claim. */
-  let s = `<p class="note"><span style="color:#B23A2B">&#9679;</span> reporting now (${nLive}) &nbsp;
-    <span style="color:#0A5A78">&#9711;</span> storm-deployment site, dark until a hurricane &nbsp;
-    <span style="color:#8A94A0">&#10005;</span> switched off &nbsp;
-    <span style="color:#0F7B7B">&#9679;</span> you and DJM</p>`;
+  /* The swatches sit on dark chips because the new pin colours are chosen to
+     survive aerial imagery, and yellow or white on a white card is invisible.
+     A legend that cannot show its own key is not a legend. */
+  const chip = (c, g) => `<span style="background:#0E1F2E;color:${c};border-radius:3px;
+    padding:1px 5px;font-weight:700">${g}</span>`;
+  let s = `<p class="note">${chip("#FF3B30","&#9679;")} reporting now (${nLive}) &nbsp;
+    ${chip("#FFD400","&#9711;")} storm-deployment site, dark until a hurricane &nbsp;
+    ${chip("#FFFFFF","&#10005;")} switched off &nbsp;
+    ${chip("#FF00A8","&#9679;")} you &nbsp;
+    ${chip("#00E5FF","&#9679;")} DJM &nbsp;
+    ${chip("#00E676","&#9679;")} Ponce Inlet</p>`;
 
   const rows = LOCATIONS.filter(l => l.key !== "inlet");
   if(rows.length){
