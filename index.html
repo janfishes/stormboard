@@ -178,7 +178,7 @@
    BUILD_NUM is what the update check compares, so it must go up on every
    deploy or a phone holding a cached copy will never learn there is a new one.
    ===================================================================== */
-const BUILD_NUM = 11;
+const BUILD_NUM = 12;
 const BUILD_STAMP = "2026-08-06";
 
 /* =====================================================================
@@ -373,7 +373,7 @@ const BUILTIN_LOCATIONS = [
     lat:29.080050, lng:-80.983283, hi:105, lo:120, est:true },
   { key:"tbtrestle", name:"Turnbull Bay Trestle",    charted:"FEC railroad, Turnbull Bay",
     lat:29.050700, lng:-80.959650, hi:110, lo:130, est:true },
-  { key:"crooks",    name:"Crook's Corner",          charted:"Turnbull Bay",
+  { key:"turnbull",  name:"Crook's Corner",          charted:"Turnbull Creek",
     lat:29.043000, lng:-80.959817, hi:120, lo:140, est:true },
   { key:"fairway",   name:"DJM",                     charted:"Aqua Ct tide gauge",
     lat:29.032633, lng:-80.946983, gauge:true, hi:149, lo:188, measured:true,
@@ -398,9 +398,9 @@ const BUILTIN_LOCATIONS = [
    ===================================================================== */
 const LS = {
   // read-only, borrowed from My Tides
-  lags:'tide-lags', pos:'tide-positions', added:'tide-added-spots',
+  lags:'tide-lags', pos:'tide-positions', added:'tide-added-spots', hidden:'tide-hidden',
   // ours
-  thresholds:'storm-thresholds', checks:'storm-checks', lead:'storm-lead-hours',
+  thresholds:'storm-thresholds', checks:'storm-checks', lead:'storm-lead-hours', shown:'storm-shown',
   here:'storm-here', transfer:'storm-surge-transfer'
 };
 function lsGet(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } }
@@ -420,6 +420,11 @@ function loadPrefs(){
     if(Array.isArray(a)) addedSpots = a;
   }catch(e){ addedSpots = []; }
   for(const s of addedSpots) LOCATIONS.push(Object.assign({ est:true, added:true }, s));
+
+  /* Every spot stays in the WATER TABLE — the bridges and the trestles are all
+     water Jan wants a height for in a storm. It is the MAP that gets trimmed,
+     below: a map is for orienting yourself, and seven forecast spots on it were
+     crowding out the three things that actually locate you. */
 
   for(const loc of LOCATIONS) offsets[loc.key] = { hi:loc.hi, lo:loc.lo };
   try{ const raw = lsGet(LS.lags); if(raw) Object.assign(offsets, JSON.parse(raw)); }catch(e){}
@@ -1400,7 +1405,13 @@ function gaugeMapSVG(live){
       pts.push({ lat:g.lat, lng:g.lng, kind:"live", label:gaugeName(g.name) });
     }
   }
-  const spots = LOCATIONS.filter(l => isFinite(l.lat));
+  /* THE MAP CARRIES THREE KINDS OF THING AND NO MORE: the gauges, DJM, and you.
+     Every forecast spot used to be drawn on it, and once they were named the map
+     had fifteen labels fighting for room and told you less than the table it was
+     meant to illustrate. A map's job here is to orient you — where the water is
+     being measured, where your dock is, where you are. The rest of the spots are
+     in the table above and their lags are footnoted under the map. */
+  const spots = LOCATIONS.filter(l => isFinite(l.lat) && (l.key === "fairway" || l.key === "inlet"));
   const all = pts.concat(spots.map(l => ({lat:l.lat, lng:l.lng})));
   if(here) all.push({lat:here.lat, lng:here.lng});
   if(!all.length) return "";
@@ -1466,6 +1477,12 @@ function gaugeMapSVG(live){
       s += `<g stroke="#8A94A0" stroke-width="2" stroke-linecap="round">
         <line x1="${(x-4.5).toFixed(1)}" y1="${(y-4.5).toFixed(1)}" x2="${(x+4.5).toFixed(1)}" y2="${(y+4.5).toFixed(1)}"/>
         <line x1="${(x-4.5).toFixed(1)}" y1="${(y+4.5).toFixed(1)}" x2="${(x+4.5).toFixed(1)}" y2="${(y-4.5).toFixed(1)}"/></g>`;
+      /* The switched-off gauges were drawn as bare crosses with no label at all,
+         so the map showed four anonymous X's and left you to guess. They are the
+         most interesting marks on it — every one is a gauge that used to measure
+         this water and does not any more — so they get their names like
+         everything else, in the same de-collision pass. */
+      labels.push({ x, y, right, t:p.label, col:"#8A94A0", off:12, small:true });
     }
   }
   /* De-collide across ALL labels, not per side. Doing it per side looked right
@@ -1511,10 +1528,33 @@ function gaugeMapSVG(live){
   return s;
 }
 function gaugeLegendHTML(nLive){
-  return `<p class="note"><span style="color:#B23A2B">&#9679;</span> reporting now (${nLive}) &nbsp;
+  /* The lags moved off the map and into this footnote. They are the number that
+     makes every other spot work — how far behind the inlet its tide runs — and
+     they are far more use as a readable list than as fifteen labels crowding a
+     600-pixel picture. A measured lag is marked, because a measured one and an
+     estimated one are not the same claim. */
+  let s = `<p class="note"><span style="color:#B23A2B">&#9679;</span> reporting now (${nLive}) &nbsp;
     <span style="color:#0A5A78">&#9711;</span> storm-deployment site, dark until a hurricane &nbsp;
     <span style="color:#8A94A0">&#10005;</span> switched off &nbsp;
-    <span style="color:#8A94A0">&#9679;</span> your spots</p>`;
+    <span style="color:#0F7B7B">&#9679;</span> you and DJM</p>`;
+
+  const rows = LOCATIONS.filter(l => l.key !== "inlet");
+  if(rows.length){
+    s += `<p class="note"><strong>Every spot, and how far behind the inlet it runs.</strong>
+      Only DJM and your own position are drawn above; the rest are in the table at the top of the
+      page. Lag is minutes after Ponce Inlet &mdash; high water first, then low.</p>`;
+    s += `<div class="wrapx"><table class="grid"><thead><tr>
+      <th>Spot</th><th class="num">High</th><th class="num">Low</th><th>Heights</th>
+      </tr></thead><tbody>`;
+    for(const l of rows){
+      const o = offsets[l.key] || { hi:l.hi, lo:l.lo };
+      s += `<tr><td>${esc(l.name)}</td>
+        <td class="num">+${o.hi} min</td><td class="num">+${o.lo} min</td>
+        <td>${l.measured ? "measured" : "inlet heights, est lag"}</td></tr>`;
+    }
+    s += `</tbody></table></div>`;
+  }
+  return s;
 }
 
 /* ---- Measured water, runoff and rain ---- */
@@ -1878,8 +1918,14 @@ const POND = {
   berm: 6.50,              // sheet 5, "TOP OF BERM EL. 6.50"
   peak25: 5.75, peak100: 6.1,
   pumps: 3, pumpCfs: 100, genKw: 780, fuelGal: 3000,
-  /* Crooked Creek into Rose Bay — sheet 4 names both. */
-  recv: { lat: 29.0955, lng: -80.9550 }
+  /* WHERE THIS POND'S WATER ACTUALLY GOES. The drawings letter the immediate
+     outfall as Crooked Creek, and the 2005 permit names the receiving waterbody
+     as SPRUCE CREEK. An earlier version of this card picked its receiving water
+     by nearest coordinate and landed on Three Bridges, which is the Halifax —
+     the wrong system entirely. Jan's correction, and the permit agrees with him.
+     So the spot is named outright rather than guessed at from distance: a
+     drainage path follows the water, not the crow. */
+  recvKey: "trestle"
 };
 
 /* Whole spans that overlap the window, matching rainAhead's convention: a QPF
@@ -1896,11 +1942,7 @@ function rainBetween(t0, t1){
 
 function pondOutlook(){
   if(!surge || !preds.length) return null;
-  let loc = null, best = Infinity;
-  for(const l of LOCATIONS){
-    const d = distNm(l, POND.recv);
-    if(d < best){ best = d; loc = l; }
-  }
+  const loc = LOCATIONS.find(l => l.key === POND.recvKey);
   if(!loc) return null;
   const events = shifted(loc.key);
   const t0 = Math.max(Date.now(), surge.t[0].getTime());
@@ -1966,7 +2008,7 @@ function pondOutlook(){
   };
   const shut = longestWait(drainTimes(true)), normal = longestWait(drainTimes(false));
   const rain = (shut.start != null) ? rainBetween(shut.start, shut.end) : null;
-  return { loc, nm: best, lowLine, shut, normal, rain, horizon: new Date(t1) };
+  return { loc, lowLine, shut, normal, rain, horizon: new Date(t1) };
 }
 
 function pondHTML(){
@@ -1999,7 +2041,7 @@ function pondHTML(){
   s += rung("Normal pool", POND.normalPool, "Where it sits between storms");
   s += rung("Pumps start", POND.pumpOn, `${POND.pumps} &times; ${POND.pumpCfs} cfs, staged, on a
         ${POND.genKw} kW generator with an automatic transfer switch`);
-  s += rung("Pond discharge", POND.weirCrest, "It starts spilling over the weir to Crooked Creek. This is normal, it is the outlet", "near");
+  s += rung("Pond discharge", POND.weirCrest, "It starts spilling over the weir, to Crooked Creek and on into Spruce Creek. This is normal, it is the outlet", "near");
   s += rung("25-year design peak", POND.peak25, "Over the weir by " + (POND.peak25 - POND.weirCrest).toFixed(2) + " ft");
   s += rung("100-year design peak", POND.peak100, `Over the weir by about ${(POND.peak100 - POND.weirCrest).toFixed(1)} ft &mdash;
         and <strong>only ${margin.toFixed(1)} ft under the berm</strong>`, "over");
@@ -2020,8 +2062,7 @@ function pondHTML(){
   } else {
     const hrs = o.shut.hours;
     s += `<p>A pond on a gravity outfall only empties while the water it drains into is low.
-      Measured at <strong>${esc(o.loc.name)}</strong>, the nearest modelled spot to Crooked Creek
-      and Rose Bay:</p>`;
+      Measured at <strong>${esc(o.loc.name)}</strong>, on the water this pond drains into:</p>`;
     s += `<p class="big">${o.shut.atLeast ? "over " : ""}${hrs.toFixed(0)} hours
       <span class="unit">without a low tide</span></p>`;
     if(o.shut.start != null)
