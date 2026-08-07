@@ -178,7 +178,7 @@
    BUILD_NUM is what the update check compares, so it must go up on every
    deploy or a phone holding a cached copy will never learn there is a new one.
    ===================================================================== */
-const BUILD_NUM = 14;
+const BUILD_NUM = 15;
 const BUILD_STAMP = "2026-08-06";
 
 /* =====================================================================
@@ -1321,16 +1321,22 @@ function waterHTML(){
 
   const visible = LOCATIONS;
   for(const loc of visible){
-    const th = thresholds[loc.key];
-    const thFt = th && isFinite(th.ft) ? th.ft : null;
-    const o = spotOutlook(loc, thFt);
+    /* MORE THAN ONE MARK PER SPOT. A spot is not one height: at DJM the dock,
+       the bank and the yard all go under at different times, and knowing the
+       dock floods tells you nothing about the bank. Marks are held as a sorted
+       list and each gets its own crossing line. */
+    const marks = marksFor(loc.key);
+    const lowest = marks.length ? marks[0].ft : null;
+    const o = spotOutlook(loc, lowest);
     if(!o || !o.peak){
       s += `<tr><td>${esc(loc.name)}</td><td class="num">&mdash;</td><td>&mdash;</td><td class="num">&mdash;</td>
             <td><button class="btn small" onclick="editThreshold('${esc(loc.key)}')">set</button></td></tr>`;
       continue;
     }
-    const over = thFt != null && o.peak.total >= thFt;
-    const near = !over && thFt != null && o.peak.total >= thFt - 0.5;
+    /* The row is coloured by the LOWEST mark, because that is the first thing
+       of yours the water reaches. */
+    const over = lowest != null && o.peak.total >= lowest;
+    const near = !over && lowest != null && o.peak.total >= lowest - 0.5;
     /* Two DIFFERENT weaknesses, and they must not be collapsed into one word.
        "est lag" means the arrival TIME is interpolated rather than timed.
        "inlet heights" means there is no measured height model at all, so the
@@ -1348,14 +1354,24 @@ function waterHTML(){
       <td class="num"><strong>${o.peak.total.toFixed(1)} ft</strong></td>
       <td>${esc(fmtDT(o.peak.t))}</td>
       <td class="num">${o.peak.surge == null ? "&mdash;" : (o.peak.surge >= 0 ? "+" : "") + o.peak.surge.toFixed(1) + " ft"}</td>
-      <td>${thFt == null
+      <td>${marks.length === 0
             ? `<button class="btn small" onclick="editThreshold('${esc(loc.key)}')">set</button>`
-            : `<button class="btn small" onclick="editThreshold('${esc(loc.key)}')">${thFt.toFixed(1)} ft</button>`}</td>
+            : marks.map((m,i) => `<button class="btn small" onclick="editThreshold('${esc(loc.key)}',${i})"
+                >${m.ft.toFixed(1)} ft</button>`).join(" ") +
+              ` <button class="btn small" onclick="editThreshold('${esc(loc.key)}')">+</button>`}</td>
     </tr>`;
-    if(thFt != null && o.first){
-      s += `<tr class="${over ? "over" : ""}"><td colspan="5" class="note">
-        &nbsp;&nbsp;${esc(th.label || "your mark")} at ${thFt.toFixed(1)} ft is under water from
-        <strong>${esc(fmtDT(o.first))}</strong> to <strong>${esc(fmtDT(o.last))}</strong>.</td></tr>`;
+    /* One line per mark, lowest first — the order the water actually takes them.
+       Each is timed against its OWN height, not the lowest one's. */
+    for(const m of marks){
+      const mo = spotOutlook(loc, m.ft);
+      if(!mo) continue;
+      const wet = mo.first != null;
+      s += `<tr class="${wet ? "over" : ""}"><td colspan="5" class="note">
+        &nbsp;&nbsp;${esc(m.label || "your mark")} at ${m.ft.toFixed(1)} ft ${
+        wet ? `is under water from <strong>${esc(fmtDT(mo.first))}</strong> to
+               <strong>${esc(fmtDT(mo.last))}</strong>`
+            : `stays dry &mdash; the peak is ${(m.ft - o.peak.total).toFixed(1)} ft below it`
+        }.</td></tr>`;
     }
   }
   s += `</tbody></table></div>`;
@@ -1442,8 +1458,26 @@ function gaugeMapSVG(live){
   const W = 640, H = Math.max(300, Math.min(560, Math.round(W*((y1-y0)/((x1-x0)*kx)))));
   const X = v => (v - x0)/(x1 - x0)*W, Y = v => H - (v - y0)/(y1 - y0)*H;
 
+  /* A REAL BASEMAP UNDER THE PINS. This was a plain grey rectangle, and dots on
+     a grey rectangle are unreadable — you cannot tell Rose Bay from Spruce Creek
+     from the Halifax, which is the entire point of putting them on a map.
+
+     USGS ImageryTopo, the same basemap WTF and Mini Mapper already use. It is
+     fetched as ONE image for the exact bounding box rather than as tiles, which
+     removes the zoom/tile arithmetic completely: both this SVG and an export in
+     EPSG:4326 are linear in longitude and latitude, so the image lines up with
+     the pin coordinates by construction and there is nothing to get subtly wrong.
+
+     The grey rectangle stays underneath on purpose. If the imagery does not load
+     — no signal, which is exactly when this page matters most — the map degrades
+     to what it was before instead of to nothing. */
+  const bbox = [x0, y0, x1, y1].map(v => v.toFixed(6)).join(",");
+  const base = "https://basemap.nationalmap.gov/arcgis/rest/services/USGSImageryTopo/MapServer/export"
+    + `?bbox=${bbox}&bboxSR=4326&imageSR=4326&size=${W},${H}&format=png&transparent=false&f=image`;
   let s = `<svg class="cone" viewBox="0 0 ${W} ${H}" role="img" aria-label="Where the gauges are">`;
   s += `<rect width="${W}" height="${H}" fill="#EDF2F6"/>`;
+  s += `<image href="${esc(base)}" x="0" y="0" width="${W}" height="${H}"
+         preserveAspectRatio="none" opacity="0.92"/>`;
 
   // Your spots first, so a gauge pin always sits on top of them.
   for(const l of spots){
@@ -1540,7 +1574,8 @@ function gaugeMapSVG(live){
     s += `<text x="${tx.toFixed(1)}" y="${(l.ly + 3.6).toFixed(1)}" font-family="monospace"
       font-size="${l.small ? "9.2" : "10.5"}" font-weight="${l.small ? "600" : "700"}"
       text-anchor="${anchor}" fill="${l.col}"
-      stroke="#EDF2F6" stroke-width="3.2" paint-order="stroke">${esc(l.t)}</text>`;
+      stroke="#FFFFFF" stroke-width="3.4" stroke-opacity="0.95"
+      paint-order="stroke">${esc(l.t)}</text>`;
   }
   s += `</svg>`;
   return s;
@@ -1801,15 +1836,25 @@ function groundHTML(){
     <div class="card-title">Your ground<span class="sub">USGS lidar &middot; FEMA flood zone</span></div>
     ${badge}</div><div class="body">`;
 
+  /* THE BUTTONS ALWAYS SHOW, set or not. They used to disappear the moment a
+     position was stored, which quietly broke the one workflow this card exists
+     for: walk to the bank, read the ground THERE, then walk to the dock and read
+     it again. A control you need twice cannot be a control that vanishes after
+     the first use. */
+  s += `<div class="btnrow"><button class="btn" onclick="locateHere()">${
+      here ? "Re-read where I am now" : "Use my location"}</button
+    ><button class="btn" onclick="typeHere()">Type it in</button></div>`;
   if(!here){
-    s += `<p>Set where you are and this card looks up the height of the land under you from USGS
-      lidar, and your FEMA flood zone, and puts both next to the forecast water.</p>
-      <div class="btnrow"><button class="btn" onclick="locateHere()">Use my location</button
-        ><button class="btn" onclick="typeHere()">Type it in</button></div>
+    s += `<p>Stand on the thing you care about and tap that. The card looks up the height of the
+      land under you from USGS lidar, and your FEMA flood zone, and puts both next to the forecast
+      water.</p>
       <p class="note">Your position is kept on this device only. It is never sent anywhere except
       to USGS and FEMA to ask about that point, and it is not in this app's source.</p>`;
     return s + `</div></div>`;
   }
+  s += `<p class="note">Reading for ${here.lat.toFixed(5)}, ${here.lng.toFixed(5)}${
+    here.acc ? ` (&plusmn;${Math.round(here.acc)} m)` : ""} &mdash; move and tap again to read
+    somewhere else.</p>`;
   if(groundErr) s += `<p>Couldn't reach the elevation services (${esc(groundErr)}).</p>`;
   if(!ground && !groundErr) s += `<p class="note">Looking up the ground under you&hellip;</p>`;
 
@@ -1944,8 +1989,10 @@ const POND = {
      So the spot is named outright rather than guessed at from distance: a
      drainage path follows the water, not the crow.
 
-     And it is SPRUCE CREEK PARK, not the trestle. Both are on Spruce Creek, but
-     the park is the MEASURED one — a Stevens survey, 59 samples, its own height
+     WHICH POINT IS STILL OPEN. The documents give Crooked Creek -> Rose Bay and
+     no further; anything past that is inference and one version of this comment
+     inferred wrongly. Jan asked for Spruce Creek, so Spruce Creek Park is used —
+     the MEASURED point on that water rather than the trestle, which — a Stevens survey, 59 samples, its own height
      scaling — where the trestle carries the inlet's heights with an estimated
      lag. Given a choice of two points on the right water, take the one that was
      actually surveyed. */
@@ -2065,7 +2112,7 @@ function pondHTML(){
   s += rung("Normal pool", POND.normalPool, "Where it sits between storms");
   s += rung("Pumps start", POND.pumpOn, `${POND.pumps} &times; ${POND.pumpCfs} cfs, staged, on a
         ${POND.genKw} kW generator with an automatic transfer switch`);
-  s += rung("Pond discharge", POND.weirCrest, "It starts spilling over the weir, to Crooked Creek and on into Spruce Creek. This is normal, it is the outlet", "near");
+  s += rung("Pond discharge", POND.weirCrest, "It starts spilling over the weir into Crooked Creek. This is normal, it is the outlet", "near");
   s += rung("25-year design peak", POND.peak25, "Over the weir by " + (POND.peak25 - POND.weirCrest).toFixed(2) + " ft");
   s += rung("100-year design peak", POND.peak100, `Over the weir by about ${(POND.peak100 - POND.weirCrest).toFixed(1)} ft &mdash;
         and <strong>only ${margin.toFixed(1)} ft under the berm</strong>`, "over");
@@ -2313,41 +2360,66 @@ function resetChecks(){
 /* Offered by the ground card: adopt the looked-up ground elevation as the mark
    for the nearest spot, so the water table starts warning against it. Labelled
    "ground" rather than "dock" so it is never mistaken for a measured height. */
+/* Marks were once a single {ft,label} per spot and are now a list. Old saved
+   data is read through this rather than migrated in place, so a copy of the app
+   on another device that has not been updated yet cannot be broken by a rewrite
+   of the shared key — the value is only ever written back as a list once the
+   user edits it here. */
+function marksFor(key){
+  const t = thresholds[key];
+  if(!t) return [];
+  const arr = Array.isArray(t) ? t : [t];
+  return arr.filter(m => m && isFinite(m.ft))
+            .map(m => ({ ft:+m.ft, label:m.label || "your mark" }))
+            .sort((a,b) => a.ft - b.ft);
+}
 function seedThresholdPicked(ft){
   const sel = document.getElementById("groundSpot");
   if(sel && sel.value) seedThreshold(sel.value, ft);
 }
 function seedThreshold(key, ft){
   if(!isFinite(ft)) return;
-  thresholds[key] = { ft: Math.round(ft*100)/100, label:"ground" };
+  const marks = marksFor(key);
+  marks.push({ ft: Math.round(ft*100)/100, label:"ground" });   // adds, never replaces
+  thresholds[key] = marks;
   saveThresholds(); render();
 }
-function editThreshold(key){
+function editThreshold(key, idx){
   const loc = LOCATIONS.find(l => l.key === key);
   if(!loc) return;
-  const cur = thresholds[key] || {};
+  const marks = marksFor(key);
+  const editing = isFinite(idx) && marks[idx];
+  const cur = editing ? marks[idx] : {};
   /* This prompt used to say only "measure it once at a known low water", which
      assumed the reader already knew what MLLW was and how to get onto it. Both
-     ways of finding the number are spelled out instead, because a box you cannot
-     fill in is the same as a feature that is not there. */
+     ways of finding the number are spelled out, because a box you cannot fill
+     in is the same as a feature that is not there. */
   const raw = prompt(
-    "Height above MLLW, in feet, of the thing you want to know about at " + loc.name +
-    ".\nThe dock deck, the ramp, the yard, the bank of the canal, the low point of the road out.\n\n" +
+    (editing ? "Change this mark at " : "Add a mark at ") + loc.name +
+    ".\nHeight above MLLW, in feet." +
+    (marks.length ? "\nAlready set: " + marks.map(m => m.label + " " + m.ft.toFixed(1)).join(", ") : "") +
+    "\n\nYou can keep several here — the dock, the bank, the yard all go under at\n" +
+    "different times, and the dock tells you nothing about the bank.\n\n" +
     "TWO WAYS TO GET THE NUMBER\n\n" +
     "1. Let the app read it. Stand on the thing, open the \"Your ground\" card, tap\n" +
     "   Use my location, and hand the elevation to this spot. Good for ground and\n" +
-    "   banks; it is bare earth, so it will not know about your dock or your slab.\n\n" +
-    "2. Measure it once, with a tape. At any moment you like, note the water height\n" +
-    "   this app shows for " + loc.name + ", then measure straight up from the water\n" +
-    "   to your mark. Add the two. That is the number, and it is good forever.\n" +
+    "   banks; it is bare earth, so it knows nothing about your dock or your slab.\n\n" +
+    "2. Measure it once, with a tape. Note the water height this app shows for\n" +
+    "   " + loc.name + " right now, then measure straight up from the water to your\n" +
+    "   mark and add the two. Good forever.\n" +
     "   Example: app says 1.2 ft, you measure 3.5 ft up to the dock -> enter 4.7\n\n" +
-    "Leave blank to clear.", cur.ft != null ? String(cur.ft) : "");
+    (editing ? "Leave blank to DELETE this mark." : "Leave blank to cancel."),
+    cur.ft != null ? String(cur.ft) : "");
   if(raw === null) return;
-  if(raw.trim() === ""){ delete thresholds[key]; saveThresholds(); render(); return; }
+  if(raw.trim() === ""){
+    if(editing){ marks.splice(idx, 1); thresholds[key] = marks; saveThresholds(); render(); }
+    return;
+  }
   const ft = parseFloat(raw);
   if(!isFinite(ft)){ alert("That is not a number of feet."); return; }
-  const label = prompt("What is it? (dock, ramp, yard…)", cur.label || "dock") || "your mark";
-  thresholds[key] = { ft, label };
+  const label = prompt("What is it? (dock, bank, yard, ramp\u2026)", cur.label || "dock") || "your mark";
+  if(editing) marks[idx] = { ft, label }; else marks.push({ ft, label });
+  thresholds[key] = marks;
   saveThresholds(); render();
 }
 function editLead(){
